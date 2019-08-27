@@ -1,20 +1,20 @@
 package bank
 
 import bank.domain.{BankAccount, Person}
-import org.scalatest.FunSuite
+import org.scalatest.{EitherValues, FunSuite}
 
-class TestPerson extends FunSuite {
+class TestPerson extends FunSuite with EitherValues {
 
   def personWithAccount(name: String) = Person(name,
     Vector(BankAccount(scala.util.Random.nextInt(22).toString, scala.util.Random.nextDouble())))
 
   def personWithoutAccount(name: String) = Person(name, Vector.empty)
 
-  test("A person can be open a bank account") {
+  test("A person can open a bank account") {
     val person = personWithoutAccount("First, Last")
     val openAccount = Person.OpenBankAccount(person.fullName).applyTo(person)
 
-    assert(openAccount.isRight, "person must be able to open a new account")
+    assert(openAccount.right.value.nonEmpty, "person must be able to open a new account")
 
     val openAccountEvent = openAccount.right.get.get
     val updatedPerson = openAccountEvent.applyTo(person)
@@ -26,7 +26,7 @@ class TestPerson extends FunSuite {
     val person = personWithAccount("First, Last")
     val closeBankAccount = Person.CloseBankAccount(person.fullName, person.bankAccounts.head).applyTo(person)
 
-    assert(closeBankAccount.isRight, "person must be ale to close its account")
+    assert(closeBankAccount.right.value.nonEmpty, "person must be able to close its account")
 
     val closedAccountEvent = closeBankAccount.right.get.get
     val updatePerson = closedAccountEvent.applyTo(person)
@@ -39,8 +39,7 @@ class TestPerson extends FunSuite {
     val personB = personWithoutAccount("Person B")
     val openAccount = Person.OpenBankAccount(personA.fullName).applyTo(personB)
 
-    assert(openAccount.isLeft, "personA cannot open a bank account to personB")
-    assert(openAccount.left.get == "Wrong person")
+    assert(openAccount.left.value ==  "Wrong person", "personA cannot open a bank account to personB")
   }
 
   test("A person can close only accounts it owns"){
@@ -48,8 +47,7 @@ class TestPerson extends FunSuite {
     val account = BankAccount(scala.util.Random.nextInt(22).toString, 42)
     val closeAccount = Person.CloseBankAccount(person.fullName, account).applyTo(person)
 
-    assert(closeAccount.isRight, "Closing a nonexistent account shouldn't cause error")
-    assert(closeAccount.right.get.isEmpty, "closing a nonexistent account should result in no events")
+    assert(closeAccount.right.value.isEmpty, "closing a nonexistent account should result in no events")
   }
 
   test("A person cannot close another person's account"){
@@ -57,7 +55,7 @@ class TestPerson extends FunSuite {
     val personB = personWithAccount("Person B")
     val closeAccount = Person.CloseBankAccount(personA.fullName, personB.bankAccounts.head).applyTo(personB)
 
-    assert(closeAccount.isLeft, "a person cannot close another person's account")
+    assert(closeAccount.left.value ==  "Wrong person", "personA cannot close personB's account")
   }
 
 }
