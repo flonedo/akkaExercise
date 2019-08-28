@@ -42,7 +42,7 @@ object Person {
 
   case class OpenedBankAccount(fullName: String) extends PersonEvent {
     override def applyTo(domainEntity: Person): Person =
-      domainEntity.copy(bankAccounts = domainEntity.bankAccounts :+ BankAccount(iban = scala.util.Random.nextInt(22).toString, balance = 0))
+      domainEntity.copy(bankAccounts = domainEntity.bankAccounts :+ BankAccount(iban = java.util.UUID.randomUUID().toString, balance = 0))
   }
   
 
