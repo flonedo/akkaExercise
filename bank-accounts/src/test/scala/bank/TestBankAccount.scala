@@ -1,8 +1,8 @@
 package bank
 import bank.domain.BankAccount
-import org.scalatest.{EitherValues, FunSuite}
+import org.scalatest.FunSuite
 
-class TestBankAccount extends FunSuite with EitherValues {
+class TestBankAccount extends FunSuite {
 
 	def accountWithMoney(iban: String) = BankAccount(iban, 10000.0)
 	def accountWithoutMoney(iban: String) = BankAccount(iban, 0.0)
