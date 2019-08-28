@@ -45,4 +45,16 @@ class TestBankAccount extends FunSuite {
 				assert(action.isRight, "Error while withdrawing money from a non-empty account")
 		}
 	}
+
+	test("Deposit money into an empty bank account with wrong IBAN") {
+		val account = accountWithoutMoney("test4")
+		val action = BankAccount.Deposit("wrong", 10).applyTo(account)
+		assert(action.isLeft, "Error while depositing money into an empty bank account with wrong IBAN")
+	}
+
+	test("Withdraw money into an empty bank account with wrong IBAN") {
+		val account = accountWithoutMoney("test5")
+		val action = BankAccount.Withdraw("wrong", 10).applyTo(account)
+		assert(action.isLeft, "Error while withdrawing money into an empty bank account with wrong IBAN")
+	}
 }
