@@ -4,7 +4,7 @@ import org.scalatest.FunSuite
 
 class TestBankAccount extends FunSuite {
 
-	def accountWithMoney(iban: String) = BankAccount(iban, 100000.0)
+	def accountWithMoney(iban: String) = BankAccount(iban, 10000.0)
 
 
 	test("Deposit money with wrong IBAN") {
@@ -19,11 +19,55 @@ class TestBankAccount extends FunSuite {
 		assert(action.left.get equals "Wrong IBAN")
 	}
 
+	test("Deposit a negative amount") {
+		val account = accountWithMoney("test")
+		val action = BankAccount.Deposit(account.iban, -10.0).applyTo(account)
+		assert(action.left.get equals "Negative amount")
+	}
+
+	test("Deposit a neutral amount") {
+		val account = accountWithMoney("test")
+		val action = BankAccount.Deposit(account.iban, 0.0).applyTo(account)
+		assert(action.right.get equals None)
+	}
+
+	test("Deposit a positive amount") {
+		val account = accountWithMoney("test")
+		val action = BankAccount.Deposit(account.iban, 10.0).applyTo(account)
+		def evento = action.right.get.get
+		assert(account.balance + 10.0 == evento.applyTo(account).balance)
+	}
+
+	test("Withdraw a negative amount") {
+		val account = accountWithMoney("test")
+		val action = BankAccount.Withdraw(account.iban, -10.0).applyTo(account)
+		assert(action.left.get equals "Negative amount")
+	}
+
+	test("Withdraw a neutral amount") {
+		val account = accountWithMoney("test")
+		val action = BankAccount.Withdraw(account.iban, 0.0).applyTo(account)
+		assert(action.right.get equals None)
+	}
+
+	test("Withdraw a positive amount greater than the balance") {
+		val account = accountWithMoney("test")
+		val action = BankAccount.Withdraw(account.iban, 100000.0).applyTo(account)
+		assert(action.left.get equals "Not enought money")
+	}
+
+	test("Withdraw a positive amount less than the balance") {
+		val account = accountWithMoney("test")
+		val action = BankAccount.Withdraw(account.iban, 150.0).applyTo(account)
+		def evento = action.right.get.get
+		assert(account.balance - 150.0 == evento.applyTo(account).balance)
+	}
+
 	test("Withdraw money") {
 		def testing(n: Int, account: BankAccount): Unit = {
 			if(n == 0) return
 			//Do action
-			val x = scala.util.Random.nextInt(1000) - scala.util.Random.nextInt(500)
+			val x = scala.util.Random.nextInt(1000) - scala.util.Random.nextInt(1000)
 			val action = BankAccount.Withdraw(account.iban, x).applyTo(account)
 
 			//Testing
@@ -41,14 +85,14 @@ class TestBankAccount extends FunSuite {
 			}
 
 		}
-		testing(10000, accountWithMoney("test"))
+		testing(100, accountWithMoney("test"))
 	}
 
 	test("Deposit money") {
 		def testing(n: Int, account: BankAccount): Unit = {
 			if (n == 0) return
 			//Do action
-			val x = scala.util.Random.nextInt(1000) - scala.util.Random.nextInt(500)
+			val x = scala.util.Random.nextInt(1000) - scala.util.Random.nextInt(1000)
 			val action = BankAccount.Deposit(account.iban, x).applyTo(account)
 
 			//Testing
@@ -62,6 +106,6 @@ class TestBankAccount extends FunSuite {
 				testing(n - 1, account)
 			}
 		}
-		testing(10000, accountWithMoney("test"))
+		testing(100, accountWithMoney("test"))
 	}
 }
