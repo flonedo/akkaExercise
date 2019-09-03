@@ -17,14 +17,11 @@ object BankAccount {
 
   case class Deposit(iban: String, amount: Double) extends BankAccountCommand {
     override def applyTo(domainEntity: BankAccount): Either[String, Option[BankAccountEvent]] =
-      if (domainEntity.iban == iban) {
-        if(amount == 0) {
-          Right(None)
-        } else {
-          Right(Some(Deposited(iban, amount)))
-        }
-      } else {
-        Left("todo")
+      if (amount < 0) Left("Negative amount")
+      else if (amount == 0) Right(None)
+      else {
+        if (domainEntity.iban == iban) Right(Some(Deposited(iban, amount)))
+        else Left("Wrong IBAN")
       }
   }
 
@@ -35,16 +32,13 @@ object BankAccount {
 
   case class Withdraw(iban: String, amount: Double) extends BankAccountCommand {
     override def applyTo(domainEntity: BankAccount): Either[String, Option[Withdrawn]] =
-      //Da rivedere
-      amount match {
-        case _ < 0 => Left("Negative amount")
-        case _ == 0 => Right(None)
-        case _ => {
-          if(domainEntity.iban == iban) {
-            if(domainEntity.balance >= amount) Right(Some(Withdrawn(iban, amount)))
-            else Left("Not enought money")
-          } else Left("Wrong IBAN")
-        }
+      if (amount < 0) Left("Negative amount")
+      else if (amount == 0) Right(None)
+      else {
+        if (domainEntity.iban == iban) {
+          if (domainEntity.balance >= amount) Right(Some(Withdrawn(iban, amount)))
+          else Left("Not enought money")
+        } else Left("Wrong IBAN")
       }
   }
 
