@@ -44,6 +44,6 @@ object Person {
     override def applyTo(domainEntity: Person): Person =
       domainEntity.copy(bankAccounts = domainEntity.bankAccounts :+ BankAccount(iban = java.util.UUID.randomUUID().toString, balance = 0))
   }
-  
+
 
 }

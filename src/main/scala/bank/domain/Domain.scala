@@ -1,7 +1,5 @@
 package bank.domain
 
-import bank.domain.Domain.DomainEvent
-
 object Domain {
 
   trait DomainEntity
