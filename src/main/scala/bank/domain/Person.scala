@@ -6,11 +6,13 @@ case class Person(fullName: String, bankAccounts: Vector[BankAccount]) extends D
 
 object Person {
 
+  val empty = Person("", Vector.empty[BankAccount])
+
   sealed trait PersonEvent extends DomainEvent[Person] {
     val fullName: String
   }
 
-  sealed trait PersonCommand extends DomainCommand[Person, PersonEvent]{
+  sealed trait PersonCommand extends DomainCommand[Person, PersonEvent] {
     val fullName: String
   }
 
@@ -19,10 +21,12 @@ object Person {
       if (fullName == domainEntity.fullName) {
         if (domainEntity.bankAccounts.contains(bankAccount)) {
           Right(Some(ClosedBankAccount(fullName, bankAccount)))
+        } else {
+          Right(None)
         }
-        else Right(None)
+      } else {
+        Left("Wrong person")
       }
-      else Left("Wrong person")
     }
   }
 
@@ -35,15 +39,18 @@ object Person {
     override def applyTo(domainEntity: Person): Either[String, Option[PersonEvent]] = {
       if (fullName == domainEntity.fullName) {
         Right(Some(OpenedBankAccount(fullName)))
+      } else {
+        Left("Wrong person")
       }
-      else Left("Wrong person")
     }
   }
 
   case class OpenedBankAccount(fullName: String) extends PersonEvent {
     override def applyTo(domainEntity: Person): Person =
-      domainEntity.copy(bankAccounts = domainEntity.bankAccounts :+ BankAccount(iban = java.util.UUID.randomUUID().toString, balance = 0))
+      domainEntity.copy(
+        bankAccounts = domainEntity.bankAccounts :+ BankAccount(iban = java.util.UUID.randomUUID().toString,
+                                                                balance = 0)
+      )
   }
-
 
 }

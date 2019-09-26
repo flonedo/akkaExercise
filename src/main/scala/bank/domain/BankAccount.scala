@@ -2,10 +2,11 @@ package bank.domain
 
 import bank.domain.Domain.{DomainCommand, DomainEntity, DomainEvent}
 
-
 case class BankAccount(iban: String, balance: Double) extends DomainEntity
 
 object BankAccount {
+
+  val empty = BankAccount("", 0)
 
   sealed trait BankAccountEvent extends DomainEvent[BankAccount] {
     val iban: String
@@ -17,34 +18,46 @@ object BankAccount {
 
   case class Deposit(iban: String, amount: Double) extends BankAccountCommand {
     override def applyTo(domainEntity: BankAccount): Either[String, Option[BankAccountEvent]] =
-      if (amount < 0) Left("Negative amount")
-      else if (amount == 0) Right(None)
-      else {
-        if (domainEntity.iban == iban) Right(Some(Deposited(iban, amount)))
-        else Left("Wrong IBAN")
+      if (amount < 0) {
+        Left("Negative amount")
+      } else if (amount == 0) {
+        Right(None)
+      } else {
+        if (domainEntity.iban == iban) {
+          Right(Some(Deposited(iban, amount)))
+        } else {
+          Left("Wrong IBAN")
+        }
       }
   }
 
   case class Deposited(iban: String, amount: Double) extends BankAccountEvent {
-    override def applyTo(domainEntity: BankAccount): BankAccount = domainEntity.copy(balance = domainEntity.balance + amount)
+    override def applyTo(domainEntity: BankAccount): BankAccount =
+      domainEntity.copy(balance = domainEntity.balance + amount)
   }
-
 
   case class Withdraw(iban: String, amount: Double) extends BankAccountCommand {
     override def applyTo(domainEntity: BankAccount): Either[String, Option[Withdrawn]] =
-      if (amount < 0) Left("Negative amount")
-      else if (amount == 0) Right(None)
-      else {
+      if (amount < 0) {
+        Left("Negative amount")
+      } else if (amount == 0) {
+        Right(None)
+      } else {
         if (domainEntity.iban == iban) {
-          if (domainEntity.balance >= amount) Right(Some(Withdrawn(iban, amount)))
-          else Left("Not enought money")
-        } else Left("Wrong IBAN")
+          if (domainEntity.balance >= amount) {
+            Right(Some(Withdrawn(iban, amount)))
+          } else {
+            Left("Not enought money")
+          }
+        } else {
+          Left("Wrong IBAN")
+        }
       }
   }
 
   case class Withdrawn(iban: String, amount: Double) extends BankAccountEvent {
-    override def applyTo(domainEntity: BankAccount): BankAccount = domainEntity.copy(balance = domainEntity.balance - amount)
+    override def applyTo(domainEntity: BankAccount): BankAccount =
+      domainEntity.copy(balance = domainEntity.balance - amount)
   }
-
 
 }

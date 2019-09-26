@@ -12,5 +12,3 @@ object Domain {
     def applyTo(domainEntity: T): Either[String, Option[E]]
   }
 }
-
-
