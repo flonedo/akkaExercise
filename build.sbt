@@ -11,7 +11,6 @@ scalacOptions ++= Seq(
   "UTF-8",
   "-unchecked",
   "-Xlint",
-  "-Yno-adapted-args",
   "-Ywarn-dead-code",
   "-Ywarn-value-discard",
   "-Xfuture",
