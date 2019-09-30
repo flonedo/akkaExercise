@@ -3,6 +3,8 @@ package bank.actor.write
 import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
 import akka.cluster.sharding.ShardRegion
 import akka.persistence.{PersistentActor, SnapshotOffer}
+import bank.actor.Messages.Done
+import bank.actor.write
 import bank.domain.Person.PersonCommand
 import bank.domain.{BankAccount, Person}
 
@@ -31,7 +33,7 @@ class PersonWriterActor() extends Actor with ActorSharding with PersistentActor 
             )
             if (lastSequenceNr % snapShotInterval == 0 && lastSequenceNr != 0) {
               saveSnapshot(state)
-              sender() ! "Done"
+              sender() ! Done
             }
           }
         }
@@ -42,13 +44,13 @@ class PersonWriterActor() extends Actor with ActorSharding with PersistentActor 
             log.info(event.toString)
             if (lastSequenceNr % snapShotInterval == 0 && lastSequenceNr != 0) {
               saveSnapshot(state)
-              sender() ! "Done"
+              sender() ! Done
             }
           }
         }
 
         case Right(None) => {
-          sender() ! "Done"
+          sender() ! Done
         }
 
         case Left(error) => {
@@ -56,9 +58,31 @@ class PersonWriterActor() extends Actor with ActorSharding with PersistentActor 
         }
       }
     }
+    case init: write.PersonWriterActor.Initialize => {
+      init.applyTo(state) match {
+        case Right(Some(personInitEvent)) => {
+          persist(personInitEvent) { _ =>
+            state = initialize(state, personInitEvent)
+            log.info(personInitEvent.toString)
+            if (lastSequenceNr % snapShotInterval == 0 && lastSequenceNr != 0) {
+              saveSnapshot(state)
+            }
+            sender() ! Done
+          }
+        }
+        case Right(None) => {
+          sender() ! Done
+        }
+        case Left(error) => {
+          sender() ! error
+        }
+      }
+    }
   }
 
-  protected def update(person: Person, event: Person.PersonEvent): Person = event.applyTo(person)
+  protected def update(state: Person, event: Person.PersonEvent): Person = event.applyTo(state)
+
+  protected def initialize(state: Person, event: write.PersonWriterActor.Initialized): Person = event.applyTo(state)
 
   val snapShotInterval = 10
 
@@ -89,6 +113,22 @@ object PersonWriterActor {
     {
       case m: PersonCommand            => computeShardId(m.fullName)
       case ShardRegion.StartEntity(id) => computeShardId(id)
+    }
+  }
+
+  case class Initialize(person: Person) {
+    def applyTo(state: Person): Either[String, Option[Initialized]] = {
+      state match {
+        case Person.empty         => Right(Some(Initialized(person)))
+        case _ if state == person => Right(None)
+        case _                    => Left("error: person data is already initialized")
+      }
+    }
+  }
+
+  case class Initialized(person: Person) {
+    def applyTo(state: Person): Person = {
+      person
     }
   }
 

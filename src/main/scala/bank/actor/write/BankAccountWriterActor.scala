@@ -3,7 +3,7 @@ package bank.actor.write
 import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
 import akka.cluster.sharding.ShardRegion
 import akka.persistence.{PersistentActor, SnapshotOffer}
-import bank.actor.write.BankAccountWriterActor.Done
+import bank.actor.Messages.Done
 import bank.domain.BankAccount
 import bank.domain.BankAccount.BankAccountCommand
 
@@ -50,6 +50,10 @@ class BankAccountWriterActor() extends Actor with ActorSharding with PersistentA
             sender() ! Done
           }
         }
+        case Right(None) => {
+          sender() ! Done
+        }
+        case Left(error) => sender() ! error
       }
     }
   }
@@ -97,8 +101,9 @@ object BankAccountWriterActor {
   case class Initialize(bankAccount: BankAccount) {
     def applyTo(state: BankAccount): Either[String, Option[Initialized]] = {
       state match {
-        case BankAccount.empty => Right(Some(Initialized(bankAccount)))
-        case _                 => Right(None)
+        case BankAccount.empty         => Right(Some(Initialized(bankAccount)))
+        case _ if state == bankAccount => Right(None)
+        case _                         => Left("error: bank account is already initialized")
       }
     }
   }
@@ -108,6 +113,4 @@ object BankAccountWriterActor {
       bankAccount
     }
   }
-
-  case class Done()
 }
