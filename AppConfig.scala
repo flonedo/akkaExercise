@@ -26,4 +26,5 @@ object AppConfig {
   lazy val akkaClusterBootstrapServiceName: String = discoveryCfg getString "service-name"
   lazy val akkaClusterBootstrapKubernetes: Boolean = akkaClusterBootstrapDiscoveryMethod == "kubernetes-api"
 
+  /**file logging*/
 }
