@@ -16,11 +16,13 @@ import scala.concurrent.duration._
 
 object BankApp extends ActorSharding with App {
 
-  override implicit val system: ActorSystem = ActorSystem("bank")
+  override implicit val system: ActorSystem = ActorSystem(AppConfig.serviceName)
 
   private lazy val cluster = Cluster(system)
   private implicit lazy val logger: LoggingAdapter = system.log
   val file = new File(AppConfig.filePath)
+
+  startSystem()
 
   cluster.registerOnMemberUp({
     logger.info(s"Member up: ${cluster.selfAddress}")
@@ -33,7 +35,7 @@ object BankApp extends ActorSharding with App {
   })
 
   private def startSystem(): Unit = {
-    createClusterShardingActors()
+    createClusterSingletonActors()
     // This will start the server until the return key is pressed
     stopSystem()
   }

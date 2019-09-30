@@ -53,4 +53,20 @@ object Person {
       )
   }
 
+  case class CreatePerson(fullName: String) extends PersonCommand {
+    override def applyTo(domainEntity: Person): Either[String, Option[CreatedPerson]] = {
+      domainEntity match {
+        case Person.empty                           => Right(Some(CreatedPerson(fullName)))
+        case _ if domainEntity.fullName == fullName => Right(None)
+        case _                                      => Left("error: person data is already initialized")
+      }
+    }
+  }
+
+  case class CreatedPerson(fullName: String) extends PersonEvent {
+    def applyTo(domainEntity: Person): Person = {
+      domainEntity.copy(fullName = fullName)
+    }
+  }
+
 }

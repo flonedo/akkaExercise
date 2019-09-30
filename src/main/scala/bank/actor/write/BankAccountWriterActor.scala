@@ -34,26 +34,12 @@ class BankAccountWriterActor() extends Actor with ActorSharding with PersistentA
           }
         }
 
-        case Right(None) => sender() ! Done
-        case Left(error) => sender() ! error
-      }
-    }
-    case init: BankAccountWriterActor.Initialize => {
-      init.applyTo(state) match {
-        case Right(Some(accountInitEvent)) => {
-          persist(accountInitEvent) { _ =>
-            state = initialize(state, accountInitEvent)
-            log.info(accountInitEvent.toString)
-            if (lastSequenceNr % snapShotInterval == 0 && lastSequenceNr != 0) {
-              saveSnapshot(state)
-            }
-            sender() ! Done
-          }
-        }
         case Right(None) => {
           sender() ! Done
         }
-        case Left(error) => sender() ! error
+        case Left(error) => {
+          sender() ! error
+        }
       }
     }
   }
@@ -68,9 +54,6 @@ class BankAccountWriterActor() extends Actor with ActorSharding with PersistentA
 
     case SnapshotOffer(_, snapshot: BankAccount) => state = snapshot
   }
-
-  protected def initialize(state: BankAccount, event: BankAccountWriterActor.Initialized): BankAccount =
-    event.applyTo(state)
 
 }
 
@@ -98,19 +81,4 @@ object BankAccountWriterActor {
     }
   }
 
-  case class Initialize(bankAccount: BankAccount) {
-    def applyTo(state: BankAccount): Either[String, Option[Initialized]] = {
-      state match {
-        case BankAccount.empty         => Right(Some(Initialized(bankAccount)))
-        case _ if state == bankAccount => Right(None)
-        case _                         => Left("error: bank account is already initialized")
-      }
-    }
-  }
-
-  case class Initialized(bankAccount: BankAccount) {
-    def applyTo(state: BankAccount): BankAccount = {
-      bankAccount
-    }
-  }
 }

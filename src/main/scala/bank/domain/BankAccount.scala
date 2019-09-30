@@ -60,4 +60,20 @@ object BankAccount {
       domainEntity.copy(balance = domainEntity.balance - amount)
   }
 
+  case class Create(iban: String) extends BankAccountCommand {
+    def applyTo(domainEntity: BankAccount): Either[String, Option[Created]] = {
+      domainEntity match {
+        case BankAccount.empty              => Right(Some(Created(iban)))
+        case _ if domainEntity.iban == iban => Right(None)
+        case _                              => Left("error: bank account is already initialized")
+      }
+    }
+  }
+
+  case class Created(iban: String) extends BankAccountEvent {
+    def applyTo(domainEntity: BankAccount): BankAccount = {
+      domainEntity.copy(iban = iban)
+    }
+  }
+
 }
