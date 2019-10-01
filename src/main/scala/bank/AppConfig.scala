@@ -26,11 +26,11 @@ object AppConfig {
 
   /** read stream-consumer configs */
   private val readSideCfg: Config = config getConfig "read-side"
-  lazy val readBatchSize: Int = readSideCfg getInt "batch.size"
+  lazy val readBatchSize: Int = 1 //readSideCfg getInt "batch.size"
   lazy val readWindow: FiniteDuration = readSideCfg getDuration "batch.window"
   lazy val readDelay: FiniteDuration = readSideCfg getDuration "delay"
 
-  val dbFilePath = "/project/logdb.txt"
-  val offsetFilePath = "/project/offset.txt"
+  val dbFilePath = "/Users/francescalonedo/Documents/akkaExercise/src/main/resources/logdb.txt"
+  val offsetFilePath = "/Users/francescalonedo/Documents/akkaExercise/src/main/resources/offset.txt"
 
 }

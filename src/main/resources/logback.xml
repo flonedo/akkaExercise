@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<configuration scan="false" debug="false">
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+        <layout class="ch.qos.logback.contrib.json.classic.JsonLayout">
+            <timestampFormat>yyyy-MM-dd'T'HH:mm:ss.SSSX</timestampFormat>
+            <timestampFormatTimezoneId>Etc/UTC</timestampFormatTimezoneId>
+            <jsonFormatter class="ch.qos.logback.contrib.jackson.JacksonJsonFormatter"/>
+            <appendLineSeparator>true</appendLineSeparator>
+        </layout>
+    </encoder>
+  </appender>
+  <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <File>./logs/application.log</File>x
+    <encoder>
+      <pattern>[%4p] [%d{ISO8601}] | [%t] %X{sourceThread} | %c{1}: %m%n</pattern>
+    </encoder>
+    <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+      <fileNamePattern>./logs/application.%d{yyyy-MM-dd}</fileNamePattern>
+      <maxHistory>30</maxHistory>
+    </rollingPolicy>
+  </appender>
+
+  <logger name="org.apache" level="WARN"/>
+
+  <logger name="in ch.qos.logback" level="ERROR"/> <!-- To silence expected logback log on startup-->
+  <logger name="ch.qos.logback" level="ERROR"/>
+  <logger name="c.q.l.core" level="ERROR"/>
+
+  <logger name="akkaexercise" level="INFO"/>
+
+  <root level="INFO">
+    <appender-ref ref="CONSOLE"/>
+    <appender-ref ref="FILE"/>
+  </root>
+</configuration>
