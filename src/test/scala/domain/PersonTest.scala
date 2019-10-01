@@ -1,9 +1,10 @@
 package domain
 
 import bank.domain.{BankAccount, Person}
-import org.scalatest.{EitherValues, FunSuite}
+import org.scalatest.EitherValues
+import org.scalatest.funsuite.AnyFunSuite
 
-class TestPerson extends FunSuite with EitherValues {
+class TestPerson extends AnyFunSuite with EitherValues {
 
   def personWithAccount(name: String): Person =
     Person(name, Vector(BankAccount(scala.util.Random.nextInt().toString, scala.util.Random.nextDouble())))

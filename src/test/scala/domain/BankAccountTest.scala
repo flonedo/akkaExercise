@@ -1,21 +1,24 @@
 package domain
 
 import bank.domain.BankAccount
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class TestBankAccount extends FunSuite {
+class TestBankAccount extends AnyFunSuite {
 
-  def accountWithMoney(iban: String) = BankAccount(iban, 10000.0)
+  def accountWithMoney(iban: String): BankAccount = BankAccount(iban, 10000.0)
 
   test("Deposit money with wrong IBAN") {
     val account = accountWithMoney("test")
-    val action = BankAccount.Deposit("wrong", 10).applyTo(account)
+    val amount = 10
+    val action: Either[String, Option[BankAccount.BankAccountEvent]] =
+      BankAccount.Deposit("wrong", amount).applyTo(account)
     assert(action.left.get equals "Wrong IBAN")
   }
 
   test("Withdraw money with wrong IBAN") {
     val account = accountWithMoney("test")
-    val action = BankAccount.Withdraw("wrong", 10).applyTo(account)
+    val amount = 10
+    val action: Either[String, Option[BankAccount.Withdrawn]] = BankAccount.Withdraw("wrong", amount).applyTo(account)
     assert(action.left.get equals "Wrong IBAN")
   }
 
@@ -34,8 +37,8 @@ class TestBankAccount extends FunSuite {
   test("Deposit a positive amount") {
     val account = accountWithMoney("test")
     val action = BankAccount.Deposit(account.iban, 10.0).applyTo(account)
-    def evento = action.right.get.get
-    assert(account.balance + 10.0 == evento.applyTo(account).balance)
+    def event: BankAccount.BankAccountEvent = action.right.get.get
+    assert(account.balance + 10.0 == event.applyTo(account).balance)
   }
 
   test("Withdraw a negative amount") {
@@ -59,10 +62,11 @@ class TestBankAccount extends FunSuite {
   test("Withdraw a positive amount less than the balance") {
     val account = accountWithMoney("test")
     val action = BankAccount.Withdraw(account.iban, 150.0).applyTo(account)
-    def evento = action.right.get.get
-    assert(account.balance - 150.0 == evento.applyTo(account).balance)
+    def event: BankAccount.BankAccountEvent = action.right.get.get
+    assert(account.balance - 150.0 == event.applyTo(account).balance)
   }
 
+  //what are these supposed to test??
   test("Withdraw money") {
     def testing(n: Int, account: BankAccount): Unit = {
       if (n == 0) return
