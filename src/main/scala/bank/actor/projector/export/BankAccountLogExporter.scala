@@ -8,10 +8,12 @@ import bank.actor.projector.ProjectionIndexer
 import bank.domain.BankAccount.BankAccountEvent
 import com.typesafe.scalalogging.LazyLogging
 
-import scala.concurrent.{ExecutionContext, Future}
 import scala.io.Source
+import scala.util.{Failure, Success, Try}
 
-class BankAccountLogExporter(file: File) extends ProjectionIndexer[BankAccountEvent] with LazyLogging {
+class BankAccountLogExporter(eventsFile: File, offsetFile: File)
+    extends ProjectionIndexer[BankAccountEvent]
+    with LazyLogging {
 
   implicit val ec: scala.concurrent.ExecutionContext = scala.concurrent.ExecutionContext.global
 
@@ -20,29 +22,45 @@ class BankAccountLogExporter(file: File) extends ProjectionIndexer[BankAccountEv
   override val eventsTag: String = "bank-account-details"
 
   override def readOffset(): Option[TimeBasedUUID] = {
-    val uuidLenght = 36
-    val lines = Source.fromFile(file).getLines().toVector
-    lines.size match {
-      case 0 => None
-      case i => Some(TimeBasedUUID(UUID.fromString(lines(i).takeRight(uuidLenght))))
+    val lines = Source.fromFile(offsetFile).getLines().toString()
+    Try(UUID.fromString(lines)).flatMap(x => Try(TimeBasedUUID(x))) match {
+      case Success(value) => Some(value)
+      case Failure(_)     => None
+
     }
   }
 
-  override def indexEvents(events: Seq[BankAccountEvent], offset: TimeBasedUUID): Future[Unit] = {
-    Future {
-      events.foreach { event =>
-        project(event, offset)
-        logger.info(s"${event} ${offset}")
-      }
+  override def indexEvents(events: Seq[BankAccountEvent], offset: TimeBasedUUID): Either[Exception, TimeBasedUUID] = {
+    val inserts = events.map { event =>
+      logger.info(offset.value.toString)
+      project(event, offset)
     }
+    val res: Either[Exception, TimeBasedUUID] = inserts.reduceLeft((x, y) => if (x.isLeft) x else y)
+    res match {
+      case Right(value) => writeOffset(offset)
+      case Left(error)  => ()
+    }
+    res
   }
 
-  def project(event: BankAccountEvent, offset: TimeBasedUUID): Unit = {
-    val fw = new FileWriter(file)
+  def writeOffset(offset: TimeBasedUUID): Unit = {
+    val offsetFw = new FileWriter(offsetFile)
     try {
-      fw.append(s"${event} ${offset}")
+      offsetFw.append(s"${offset}")
     } finally {
-      fw.close()
+      offsetFw.close()
+    }
+  }
+
+  def project(event: BankAccountEvent, offset: TimeBasedUUID): Either[Exception, TimeBasedUUID] = {
+    val eventsFw = new FileWriter(eventsFile)
+    try {
+      eventsFw.append(s"${event} ${offset}")
+      Right(offset)
+    } catch {
+      case e: Exception => Left(e)
+    } finally {
+      eventsFw.close()
     }
   }
 

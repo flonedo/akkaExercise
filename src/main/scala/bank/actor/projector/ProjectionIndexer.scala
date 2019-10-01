@@ -29,5 +29,5 @@ trait ProjectionIndexer[T] {
     * @param events Batch of events
     * @param offset Offset of the last event of the batch
     */
-  def indexEvents(events: Seq[T], offset: TimeBasedUUID): Future[Unit]
+  def indexEvents(events: Seq[T], offset: TimeBasedUUID): Either[Exception, TimeBasedUUID]
 }

@@ -1,22 +1,21 @@
 package bank.actor.projector
 
 import akka.NotUsed
-import akka.actor.{Actor, ActorSystem, DiagnosticActorLogging, Props}
+import akka.actor.{ActorSystem, Props}
 import akka.event.LoggingReceive
 import akka.persistence.cassandra.query.scaladsl.CassandraReadJournal
-import akka.persistence.query.{EventEnvelope, NoOffset, Offset, PersistenceQuery, TimeBasedUUID}
+import akka.persistence.query.{NoOffset, Offset, TimeBasedUUID}
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{Sink, Source}
+import akka.stream.scaladsl.Source
+import bank.AppConfig._
 import bank.actor.ReadJournalStreamManagerActor
 import bank.actor.projector.BankAccountEventProjectorActor.{OffsetRead, ReadOffset}
-import bank.actor.write.{ActorSharding, BankAccountWriterActor}
 import bank.actor.projector.EventEnvelopeSeqHandler.EventEnvelopeSeq
-import bank.AppConfig._
 import bank.actor.projector.export.BankAccountLogExporter
+import bank.actor.write.{ActorSharding, BankAccountWriterActor}
 import bank.domain.BankAccount.BankAccountEvent
 
 import scala.concurrent.ExecutionContext
-import scala.util.{Failure, Success}
 
 class BankAccountEventProjectorActor(indexer: BankAccountLogExporter)
     extends ReadJournalStreamManagerActor[EventEnvelopeSeq]
@@ -46,13 +45,20 @@ class BankAccountEventProjectorActor(indexer: BankAccountLogExporter)
   override def receive: Receive = LoggingReceive {
     case ReadOffset =>
       indexer.readOffset() match {
-        case None         => ()
+        case None         => self ! NoOffset
         case Some(offset) => self ! offset
       }
 
     case OffsetRead(offset) => {
       context.become(eventStreamStarted(offset))
+      startStream(offset)
+      log.info("({}) Stream started! Offset: {}", indexer.name, offset)
     }
+    case unknown =>
+      log.error("({}) Received unknown message in receiveCommand (sender: {} - message: {})",
+                indexer.name,
+                sender,
+                unknown)
   }
 
   def eventStreamStarted(offset: Offset, retries: Int = 0): Receive = LoggingReceive {
@@ -64,15 +70,15 @@ class BankAccountEventProjectorActor(indexer: BankAccountLogExporter)
         val originalSender = sender()
 
         log.info("({}) Processing batch of {} events", indexer.name, events.size)
-        indexer
-          .indexEvents(events, eventStreamMaxOffset)
-          .onComplete {
-            case Success(_) =>
-              log.info("({}) Indexing operation successfully completed! Offset: {}", indexer.name, eventStreamMaxOffset)
-              context.become(eventStreamStarted(eventStreamMaxOffset))
-            case Failure(exception) =>
-              log.error(exception, "({}) Indexing operation failed", indexer.name)
-          }(blockingDispatcher)
+        indexer.indexEvents(events, eventStreamMaxOffset) match {
+          case Right(_) =>
+            log.info("({}) Indexing operation successfully completed! Offset: {}", indexer.name, eventStreamMaxOffset)
+            context.become(eventStreamStarted(eventStreamMaxOffset))
+            originalSender ! AckMessage
+
+          case Left(exception) =>
+            log.error(exception, "({}) Indexing operation failed", indexer.name)
+        }
     }: Receive) orElse manageJournalStream(offset)
   }
 }

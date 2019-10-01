@@ -1,6 +1,6 @@
 package bank
 
-import akka.actor.{ActorSystem, PoisonPill}
+import akka.actor.{ActorSystem, PoisonPill, Scheduler}
 import akka.cluster.Cluster
 import akka.cluster.sharding.{ClusterSharding, ClusterShardingSettings}
 import akka.cluster.singleton.{ClusterSingletonManager, ClusterSingletonManagerSettings}
@@ -8,21 +8,39 @@ import akka.event.LoggingAdapter
 import bank.actor.projector.export.BankAccountLogExporter
 import bank.actor.projector.{BankAccountEventProjectorActor, ProjectionIndexer}
 import bank.actor.write.{ActorSharding, BankAccountWriterActor, PersonWriterActor}
-import bank.domain.BankAccount.BankAccountEvent
+import akka.management.scaladsl.AkkaManagement
 import java.io.File
+
+import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.server.{Directive, ExceptionHandler, HttpApp, RejectionHandler, Route}
+import akka.http.scaladsl.settings.ServerSettings
+import akka.management.cluster.bootstrap.ClusterBootstrap
+import akka.util.Timeout
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-object BankApp extends ActorSharding with App {
+object BankApp extends HttpApp with ActorSharding with App {
 
   override implicit val system: ActorSystem = ActorSystem(AppConfig.serviceName)
 
+  private implicit val scheduler: Scheduler = system.scheduler
+
   private lazy val cluster = Cluster(system)
   private implicit lazy val logger: LoggingAdapter = system.log
-  val file = new File(AppConfig.filePath)
+  private implicit val timeout: Timeout = Timeout(AppConfig.askTimeout)
+
+  val dbFile = new File(AppConfig.dbFilePath)
+  val offsetFile = new File(AppConfig.offsetFilePath)
 
   startSystem()
+
+  if (AppConfig.akkaClusterBootstrapKubernetes) {
+    // Akka Management hosts the HTTP routes used by bootstrap
+    AkkaManagement(system).start()
+    // Starting the bootstrap process needs to be done explicitly
+    ClusterBootstrap(system).start()
+  }
 
   cluster.registerOnMemberUp({
     logger.info(s"Member up: ${cluster.selfAddress}")
@@ -37,6 +55,8 @@ object BankApp extends ActorSharding with App {
   private def startSystem(): Unit = {
     createClusterSingletonActors()
     // This will start the server until the return key is pressed
+    startServer(AppConfig.serviceInterface, AppConfig.servicePort, system)
+
     stopSystem()
   }
 
@@ -66,12 +86,20 @@ object BankApp extends ActorSharding with App {
   private def createClusterSingletonActors(): Unit = {
     system.actorOf(
       ClusterSingletonManager.props(
-        singletonProps = BankAccountEventProjectorActor.props(new BankAccountLogExporter(file)),
+        singletonProps = BankAccountEventProjectorActor.props(new BankAccountLogExporter(dbFile, offsetFile)),
         terminationMessage = PoisonPill,
         settings = ClusterSingletonManagerSettings(system)
       ),
       BankAccountEventProjectorActor.name
     )
+  }
+
+  def routes: Route = {
+    path("createAccount") {
+      get {
+        complete(StatusCodes.OK)
+      }
+    }
   }
 
 }
