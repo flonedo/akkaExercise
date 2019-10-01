@@ -26,6 +26,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.scala-logging" %% "scala-logging" % "3.9.2",
   "ch.qos.logback.contrib" % "logback-jackson" % "0.1.5",
   "ch.qos.logback.contrib" % "logback-json-classic" % "0.1.5",
+  "com.github.dnvriend" %% "akka-persistence-inmemory" % "2.5.15.2" % Test,
   "com.typesafe.akka" %% "akka-testkit" % "2.5.25" % Test,
   "org.scalatest" %% "scalatest" % "3.0.8" % Test,
   "org.scalatestplus" %% "scalatestplus-junit" % "1.0.0-SNAP9" % Test
