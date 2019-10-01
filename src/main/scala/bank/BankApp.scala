@@ -32,10 +32,16 @@ object BankApp extends HttpApp with ActorSharding with App {
   private implicit val timeout: Timeout = Timeout(AppConfig.askTimeout)
 
   val dbFile = new File(AppConfig.dbFilePath)
+  if (!dbFile.exists()) {
+    dbFile.createNewFile()
+  }
   val offsetFile = new File(AppConfig.offsetFilePath)
+  if (!offsetFile.exists()) {
+    offsetFile.createNewFile()
+  }
 
   private implicit val blockingDispatcher: MessageDispatcher =
-    system.dispatchers.lookup(id = "exercise-blocking-dispatcher")
+    system.dispatchers.lookup(id = "akka-exercise-blocking-dispatcher")
 
   startSystem()
 

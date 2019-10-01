@@ -45,8 +45,8 @@ class BankAccountEventProjectorActor(indexer: BankAccountLogExporter)
   override def receive: Receive = LoggingReceive {
     case ReadOffset =>
       indexer.readOffset() match {
-        case None         => self ! NoOffset
-        case Some(offset) => self ! offset
+        case None         => self ! OffsetRead(NoOffset)
+        case Some(offset) => self ! OffsetRead(offset)
       }
 
     case OffsetRead(offset) => {
@@ -78,6 +78,7 @@ class BankAccountEventProjectorActor(indexer: BankAccountLogExporter)
 
           case Left(exception) =>
             log.error(exception, "({}) Indexing operation failed", indexer.name)
+            throw exception // effect: restart actor
         }
     }: Receive) orElse manageJournalStream(offset)
   }

@@ -1,6 +1,7 @@
 package bank.actor.write
 
-import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
+import akka.actor.SupervisorStrategy.Stop
+import akka.actor.{Actor, ActorLogging, ActorSystem, Props, ReceiveTimeout}
 import akka.cluster.sharding.ShardRegion
 import akka.persistence.{PersistentActor, SnapshotOffer}
 import bank.actor.Messages.Done
