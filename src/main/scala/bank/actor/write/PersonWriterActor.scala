@@ -23,7 +23,7 @@ class PersonWriterActor() extends Actor with ActorSharding with PersistentActor 
     case personOperation: Person.PersonCommand => {
       personOperation.applyTo(state) match {
 
-        case Right(Some(event: Person.ClosedBankAccount)) => {
+        case Right(Some(event: Person.PersonEvent)) => {
           persist(event) { _ =>
             state = update(state, event)
             log.info(event.toString)
