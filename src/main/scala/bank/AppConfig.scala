@@ -18,18 +18,19 @@ object AppConfig {
   lazy val serviceInterface: String = config.getString("http.interface")
   lazy val servicePort: Int = config.getInt("http.port")
 
-  /** read stream-consumer configs */
-  private val readSideCfg: Config = config getConfig "read-side"
-  lazy val readBatchSize: Int = readSideCfg getInt "batch.size"
-  lazy val readWindow: FiniteDuration = readSideCfg getDuration "batch.window"
-  lazy val readDelay: FiniteDuration = readSideCfg getDuration "delay"
-
   /** akka management k8s */
   private val discoveryCfg: Config = config getConfig "akka.management.cluster.bootstrap.contact-point-discovery"
   lazy val akkaClusterBootstrapDiscoveryMethod: String = discoveryCfg getString "discovery-method"
   lazy val akkaClusterBootstrapServiceName: String = discoveryCfg getString "service-name"
   lazy val akkaClusterBootstrapKubernetes: Boolean = akkaClusterBootstrapDiscoveryMethod == "kubernetes-api"
 
-  val filePath = "/project/logdb.txt"
+  /** read stream-consumer configs */
+  private val readSideCfg: Config = config getConfig "read-side"
+  lazy val readBatchSize: Int = readSideCfg getInt "batch.size"
+  lazy val readWindow: FiniteDuration = readSideCfg getDuration "batch.window"
+  lazy val readDelay: FiniteDuration = readSideCfg getDuration "delay"
+
+  val dbFilePath = "/project/logdb.txt"
+  val offsetFilePath = "/project/offset.txt"
 
 }
