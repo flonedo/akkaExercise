@@ -15,8 +15,8 @@ object AppConfig {
   lazy val environment: String = config.getString("env")
   lazy val serviceName: String = config.getString("service")
   lazy val askTimeout: FiniteDuration = config getDuration "ask.timeout"
-  lazy val serviceInterface: String = config.getString("http.interface")
-  lazy val servicePort: Int = config.getInt("http.port")
+//  lazy val serviceInterface: String = config.getString("http.interface")
+  // lazy val servicePort: Int = config.getInt("http.port")
 
   /** akka management k8s */
   private val discoveryCfg: Config = config getConfig "akka.management.cluster.bootstrap.contact-point-discovery"

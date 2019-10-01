@@ -10,7 +10,6 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-remote" % "2.5.25",
   "com.typesafe.akka" %% "akka-actor" % "2.5.25",
   "com.typesafe.akka" %% "akka-slf4j" % "2.5.25",
-  "com.typesafe.akka" %% "akka-cluster-metrics" % "2.5.25",
   "com.typesafe.akka" %% "akka-discovery" % "2.5.25",
   "com.typesafe.akka" %% "akka-persistence-cassandra" % "0.99",
   "com.typesafe.akka" %% "akka-persistence-cassandra-launcher" % "0.99",

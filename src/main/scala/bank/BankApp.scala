@@ -11,6 +11,7 @@ import bank.actor.write.{ActorSharding, BankAccountWriterActor, PersonWriterActo
 import akka.management.scaladsl.AkkaManagement
 import java.io.File
 
+import akka.dispatch.MessageDispatcher
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.{Directive, ExceptionHandler, HttpApp, RejectionHandler, Route}
 import akka.http.scaladsl.settings.ServerSettings
@@ -32,6 +33,9 @@ object BankApp extends HttpApp with ActorSharding with App {
 
   val dbFile = new File(AppConfig.dbFilePath)
   val offsetFile = new File(AppConfig.offsetFilePath)
+
+  private implicit val blockingDispatcher: MessageDispatcher =
+    system.dispatchers.lookup(id = "exercise-blocking-dispatcher")
 
   startSystem()
 
@@ -55,9 +59,9 @@ object BankApp extends HttpApp with ActorSharding with App {
   private def startSystem(): Unit = {
     createClusterSingletonActors()
     // This will start the server until the return key is pressed
-    startServer(AppConfig.serviceInterface, AppConfig.servicePort, system)
+    //startServer(AppConfig.serviceInterface, AppConfig.servicePort, system)
 
-    stopSystem()
+    //stopSystem()
   }
 
   private def stopSystem(): Unit = {

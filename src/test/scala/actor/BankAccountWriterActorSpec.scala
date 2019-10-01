@@ -38,7 +38,7 @@ class BankAccountWriterActorSpec
 
       testProbe.send(writerActor, BankAccount.Create("someiban"))
 
-      testProbe.expectMsg(10 seconds, Messages.Done)
+      testProbe.expectMsg(50 seconds, Messages.Done)
     }
   }
 }
