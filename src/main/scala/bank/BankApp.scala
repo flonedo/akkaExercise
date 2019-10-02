@@ -4,26 +4,29 @@ import akka.actor.{ActorSystem, PoisonPill, Scheduler}
 import akka.cluster.Cluster
 import akka.cluster.sharding.{ClusterSharding, ClusterShardingSettings}
 import akka.cluster.singleton.{ClusterSingletonManager, ClusterSingletonManagerSettings}
-import akka.event.LoggingAdapter
-import bank.actor.projector.export.BankAccountLogExporter
-import bank.actor.projector.{BankAccountEventProjectorActor, ProjectionIndexer}
-import bank.actor.write.{ActorSharding, BankAccountWriterActor, PersonWriterActor}
-import akka.management.scaladsl.AkkaManagement
-import java.io.File
-
 import akka.dispatch.MessageDispatcher
+import akka.event.LoggingAdapter
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.server.{Directive, ExceptionHandler, HttpApp, RejectionHandler, Route}
-import akka.http.scaladsl.settings.ServerSettings
+import akka.http.scaladsl.server.{HttpApp, Route}
 import akka.management.cluster.bootstrap.ClusterBootstrap
+import akka.management.scaladsl.AkkaManagement
+import akka.pattern.ask
 import akka.util.Timeout
+import bank.actor.Messages.Done
+import bank.actor.projector.BankAccountEventProjectorActor
+import bank.actor.projector.export.BankAccountLogExporter
+import bank.actor.write.{ActorSharding, BankAccountWriterActor, PersonWriterActor}
+import bank.domain.BankAccount
+import bank.domain.BankAccount.BankAccountCommand
+import com.typesafe.config.ConfigFactory
+import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
 object BankApp extends HttpApp with ActorSharding with App {
 
-  override implicit val system: ActorSystem = ActorSystem(AppConfig.serviceName)
+  override implicit val system: ActorSystem = ActorSystem(AppConfig.serviceName, ConfigFactory.load())
 
   private implicit val scheduler: Scheduler = system.scheduler
 
@@ -31,14 +34,8 @@ object BankApp extends HttpApp with ActorSharding with App {
   private implicit lazy val logger: LoggingAdapter = system.log
   private implicit val timeout: Timeout = Timeout(AppConfig.askTimeout)
 
-  val dbFile = new File(AppConfig.dbFilePath)
-  if (!dbFile.exists()) {
-    dbFile.createNewFile()
-  }
-  val offsetFile = new File(AppConfig.offsetFilePath)
-  if (!offsetFile.exists()) {
-    offsetFile.createNewFile()
-  }
+  val dbFilePath = AppConfig.dbFilePath
+  val offsetFilePath = AppConfig.offsetFilePath
 
   private implicit val blockingDispatcher: MessageDispatcher =
     system.dispatchers.lookup(id = "akka-exercise-blocking-dispatcher")
@@ -54,7 +51,7 @@ object BankApp extends HttpApp with ActorSharding with App {
 
   cluster.registerOnMemberUp({
     logger.info(s"Member up: ${cluster.selfAddress}")
-    createClusterShardingActors()
+    //createClusterShardingActors()
   })
 
   cluster.registerOnMemberRemoved({
@@ -65,9 +62,10 @@ object BankApp extends HttpApp with ActorSharding with App {
   private def startSystem(): Unit = {
     createClusterSingletonActors()
     // This will start the server until the return key is pressed
-    //startServer(AppConfig.serviceInterface, AppConfig.servicePort, system)
+    createClusterShardingActors()
+    startServer(AppConfig.serviceInterface, AppConfig.servicePort, system)
 
-    //stopSystem()
+    stopSystem()
   }
 
   private def stopSystem(): Unit = {
@@ -84,19 +82,19 @@ object BankApp extends HttpApp with ActorSharding with App {
       extractEntityId = BankAccountWriterActor.extractEntityId,
       extractShardId = BankAccountWriterActor.extractShardId
     )
-    ClusterSharding(system).start(
+    /*ClusterSharding(system).start(
       typeName = PersonWriterActor.name,
       entityProps = PersonWriterActor.props(),
       settings = ClusterShardingSettings(system),
       extractEntityId = PersonWriterActor.extractEntityId,
       extractShardId = PersonWriterActor.extractShardId
-    )
+    )*/
   }
 
   private def createClusterSingletonActors(): Unit = {
     system.actorOf(
       ClusterSingletonManager.props(
-        singletonProps = BankAccountEventProjectorActor.props(new BankAccountLogExporter(dbFile, offsetFile)),
+        singletonProps = BankAccountEventProjectorActor.props(new BankAccountLogExporter(dbFilePath, offsetFilePath)),
         terminationMessage = PoisonPill,
         settings = ClusterSingletonManagerSettings(system)
       ),
@@ -106,10 +104,28 @@ object BankApp extends HttpApp with ActorSharding with App {
 
   def routes: Route = {
     path("createAccount") {
-      get {
-        complete(StatusCodes.OK)
+      post {
+        entity(as[BankAccount.Create])(forwardRequest)
+      }
+    } ~
+      path("deposit") {
+        post {
+          entity(as[BankAccount.Deposit])(forwardRequest)
+        }
+      } ~
+      path("withdraw") {
+        post {
+          entity(as[BankAccount.Withdraw])(forwardRequest)
+        }
+      }
+  }
+
+  def forwardRequest[R <: BankAccountCommand]: R => Route =
+    (request: R) => {
+      onSuccess(accountRegion ? request) {
+        case Done => complete(StatusCodes.OK -> s"${request}")
+        case e    => complete(StatusCodes.BadRequest -> e.toString)
       }
     }
-  }
 
 }

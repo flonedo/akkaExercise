@@ -15,8 +15,8 @@ object AppConfig {
   lazy val environment: String = config.getString("env")
   lazy val serviceName: String = config.getString("service")
   lazy val askTimeout: FiniteDuration = config getDuration "ask.timeout"
-//  lazy val serviceInterface: String = config.getString("http.interface")
-  // lazy val servicePort: Int = config.getInt("http.port")
+  lazy val serviceInterface: String = config.getString("http.interface")
+  lazy val servicePort: Int = config.getInt("http.port")
 
   /** akka management k8s */
   private val discoveryCfg: Config = config getConfig "akka.management.cluster.bootstrap.contact-point-discovery"
@@ -30,7 +30,7 @@ object AppConfig {
   lazy val readWindow: FiniteDuration = readSideCfg getDuration "batch.window"
   lazy val readDelay: FiniteDuration = readSideCfg getDuration "delay"
 
-  val dbFilePath = "/Users/francescalonedo/Documents/akkaExercise/src/main/resources/logdb.txt"
-  val offsetFilePath = "/Users/francescalonedo/Documents/akkaExercise/src/main/resources/offset.txt"
+  val dbFilePath = "db.csv"
+  val offsetFilePath = "offset.csv"
 
 }
