@@ -33,7 +33,7 @@
 
   <logger name="akkaexercise" level="INFO"/>
 
-  <root level="TEST">
+  <root level="INFO">
     <appender-ref ref="CONSOLE"/>
     <appender-ref ref="FILE"/>
   </root>
