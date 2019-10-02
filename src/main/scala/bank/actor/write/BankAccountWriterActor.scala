@@ -1,9 +1,9 @@
 package bank.actor.write
 
-import akka.actor.SupervisorStrategy.Stop
 import akka.actor.{Actor, ActorLogging, ActorSystem, Props, ReceiveTimeout}
 import akka.cluster.sharding.ShardRegion
-import akka.persistence.{PersistentActor, SnapshotOffer}
+import akka.event.LoggingReceive
+import akka.persistence.{PersistentActor, RecoveryCompleted, SnapshotOffer}
 import bank.actor.Messages.Done
 import bank.domain.BankAccount
 import bank.domain.BankAccount.BankAccountCommand
@@ -19,6 +19,10 @@ class BankAccountWriterActor() extends Actor with ActorSharding with PersistentA
   var state: BankAccount = BankAccount.empty
 
   context.setReceiveTimeout(120.seconds)
+  private def receivePassivate: Receive = {
+    case ReceiveTimeout        => context.parent ! ShardRegion.Passivate
+    case ShardRegion.Passivate => context.stop(self)
+  }
 
   override def receiveCommand: Receive = {
     case bankOperation: BankAccount.BankAccountCommand => {
@@ -49,11 +53,13 @@ class BankAccountWriterActor() extends Actor with ActorSharding with PersistentA
 
   val snapShotInterval = 10
 
-  override val receiveRecover: Receive = {
-
-    case event: BankAccount.BankAccountEvent => update(state, event)
-
+  override def receiveRecover: Receive = receivePassivate orElse LoggingReceive {
+    case RecoveryCompleted => log.info("Recovery completed!")
+    case event: BankAccount.BankAccountEvent =>
+      log.debug("Sto rivivendo, tacchino: {}", event.toString)
+      update(state, event)
     case SnapshotOffer(_, snapshot: BankAccount) => state = snapshot
+    case unknown                                 => log.error(s"Received unknown message in receiveRecover:$unknown")
   }
 
 }
@@ -64,7 +70,7 @@ object BankAccountWriterActor {
 
   val name = "bank-account-writer-actor"
 
-  val bankAccountDetailsTag: String = "bank-account-details"
+  val bankAccountDetailsTag: String = "bank-account"
 
   def props(): Props = Props(new BankAccountWriterActor())
 

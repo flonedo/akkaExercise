@@ -1,6 +1,8 @@
 package bank.domain
 
 import bank.domain.Domain.{DomainCommand, DomainEntity, DomainEvent}
+import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
+import io.circe.{Decoder, Encoder}
 
 case class BankAccount(iban: String, balance: Double) extends DomainEntity
 
@@ -15,7 +17,8 @@ object BankAccount {
   sealed trait BankAccountCommand extends DomainCommand[BankAccount, BankAccountEvent] {
     val iban: String
   }
-
+  implicit val dDeposit: Decoder[Deposit] = deriveDecoder[Deposit]
+  implicit val eDeposit: Encoder[Deposit] = deriveEncoder[Deposit]
   case class Deposit(iban: String, amount: Double) extends BankAccountCommand {
     override def applyTo(domainEntity: BankAccount): Either[String, Option[BankAccountEvent]] =
       if (amount < 0) {
@@ -36,6 +39,8 @@ object BankAccount {
       domainEntity.copy(balance = domainEntity.balance + amount)
   }
 
+  implicit val dWithdraw: Decoder[Withdraw] = deriveDecoder[Withdraw]
+  implicit val eWithdraw: Encoder[Withdraw] = deriveEncoder[Withdraw]
   case class Withdraw(iban: String, amount: Double) extends BankAccountCommand {
     override def applyTo(domainEntity: BankAccount): Either[String, Option[Withdrawn]] =
       if (amount < 0) {
@@ -47,7 +52,7 @@ object BankAccount {
           if (domainEntity.balance >= amount) {
             Right(Some(Withdrawn(iban, amount)))
           } else {
-            Left("Not enought money")
+            Left("Insufficient funds")
           }
         } else {
           Left("Wrong IBAN")
@@ -60,6 +65,8 @@ object BankAccount {
       domainEntity.copy(balance = domainEntity.balance - amount)
   }
 
+  implicit val dCreate: Decoder[Create] = deriveDecoder[Create]
+  implicit val eCreate: Encoder[Create] = deriveEncoder[Create]
   case class Create(iban: String) extends BankAccountCommand {
     def applyTo(domainEntity: BankAccount): Either[String, Option[Created]] = {
       domainEntity match {

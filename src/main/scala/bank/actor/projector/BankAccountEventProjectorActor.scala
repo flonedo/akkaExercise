@@ -31,23 +31,29 @@ class BankAccountEventProjectorActor(indexer: BankAccountLogExporter)
   implicit val blockingDispatcher: ExecutionContext =
     context.system.dispatchers.lookup(id = "akka-exercise-blocking-dispatcher")
 
-  override def preStart(): Unit = context.system.scheduler.scheduleOnce(readDelay, self, ReadOffset)(system.dispatcher)
+  override def preStart(): Unit = {
+    println("projector init")
+    context.system.scheduler.scheduleOnce(readDelay, self, ReadOffset)(system.dispatcher)
+  }
 
   override protected def createSource(
       readJournal: CassandraReadJournal,
       offset: Offset
-  ): Source[EventEnvelopeSeq, NotUsed] =
+  ): Source[EventEnvelopeSeq, NotUsed] = {
+    println("source creation")
     readJournal
       .eventsByTag(BankAccountWriterActor.bankAccountDetailsTag, offset)
       .groupedWithin(readBatchSize, readWindow)
       .map(EventEnvelopeSeq(_))
+  }
 
   override def receive: Receive = LoggingReceive {
-    case ReadOffset =>
+    case ReadOffset => {
       indexer.readOffset() match {
         case None         => self ! OffsetRead(NoOffset)
         case Some(offset) => self ! OffsetRead(offset)
       }
+    }
 
     case OffsetRead(offset) => {
       context.become(eventStreamStarted(offset))
@@ -61,13 +67,15 @@ class BankAccountEventProjectorActor(indexer: BankAccountLogExporter)
                 unknown)
   }
 
-  def eventStreamStarted(offset: Offset, retries: Int = 0): Receive = LoggingReceive {
+  def eventStreamStarted(offset: Offset): Receive = LoggingReceive {
     ({
       case groupedEvents: EventEnvelopeSeq =>
         val offset2event: Seq[(TimeBasedUUID, BankAccountEvent)] = extractOffsetsAndEvents(groupedEvents)
         val eventStreamMaxOffset: TimeBasedUUID = getMaxOffset(offset2event)
         val events = offset2event map (_._2)
         val originalSender = sender()
+
+        println("event stream")
 
         log.info("({}) Processing batch of {} events", indexer.name, events.size)
         indexer.indexEvents(events, eventStreamMaxOffset) match {
