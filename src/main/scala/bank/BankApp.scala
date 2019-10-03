@@ -15,7 +15,7 @@ import akka.util.Timeout
 import bank.actor.Messages.Done
 import bank.actor.projector.BankAccountEventProjectorActor
 import bank.actor.projector.export.BankAccountLogExporter
-import bank.actor.write.{ActorSharding, BankAccountWriterActor, PersonWriterActor}
+import bank.actor.write.{ActorSharding, BankAccountWriterActor}
 import bank.domain.BankAccount
 import bank.domain.BankAccount.BankAccountCommand
 import com.typesafe.config.ConfigFactory
@@ -24,6 +24,7 @@ import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
+/*** sbt -Denv=local run ***/
 object BankApp extends HttpApp with ActorSharding with App {
 
   override implicit val system: ActorSystem = ActorSystem(AppConfig.serviceName, ConfigFactory.load())
@@ -39,6 +40,8 @@ object BankApp extends HttpApp with ActorSharding with App {
 
   private implicit val blockingDispatcher: MessageDispatcher =
     system.dispatchers.lookup(id = "akka-exercise-blocking-dispatcher")
+
+  //TODO find the reason why recover doesn't revive the prersistent actors from cassandra
 
   startSystem()
 
@@ -103,7 +106,7 @@ object BankApp extends HttpApp with ActorSharding with App {
   }
 
   def routes: Route = {
-    path("createAccount") {
+    path("create") {
       post {
         entity(as[BankAccount.Create])(forwardRequest)
       }

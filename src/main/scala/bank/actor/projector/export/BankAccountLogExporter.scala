@@ -9,7 +9,7 @@ import bank.domain.BankAccount.BankAccountEvent
 import com.typesafe.scalalogging.LazyLogging
 
 import scala.io.Source
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Try}
 
 class BankAccountLogExporter(eventsFilePath: String, offsetFilePath: String)
     extends ProjectionIndexer[BankAccountEvent]

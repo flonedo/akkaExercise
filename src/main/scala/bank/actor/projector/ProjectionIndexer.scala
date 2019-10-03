@@ -2,8 +2,6 @@ package bank.actor.projector
 
 import akka.persistence.query.TimeBasedUUID
 
-import scala.concurrent.Future
-
 trait ProjectionIndexer[T] {
 
   /**
