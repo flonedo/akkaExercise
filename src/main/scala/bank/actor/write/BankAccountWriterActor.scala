@@ -56,10 +56,14 @@ class BankAccountWriterActor() extends Actor with ActorSharding with PersistentA
   override def receiveRecover: Receive = receivePassivate orElse LoggingReceive {
     case RecoveryCompleted => log.info("Recovery completed!")
     case event: BankAccount.BankAccountEvent =>
-      log.debug("Sto rivivendo, tacchino: {}", event.toString)
-      update(state, event)
-    case SnapshotOffer(_, snapshot: BankAccount) => state = snapshot
-    case unknown                                 => log.error(s"Received unknown message in receiveRecover:$unknown")
+      state = update(state, event)
+    case SnapshotOffer(_, snapshot: BankAccount) => {
+      state match {
+        case BankAccount.empty => state = snapshot
+        case _                 => ()
+      }
+    }
+    case unknown => log.error(s"Received unknown message in receiveRecover:$unknown")
   }
 
 }
