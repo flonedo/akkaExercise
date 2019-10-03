@@ -40,7 +40,6 @@ class BankAccountLogExporter(eventsFilePath: String, offsetFilePath: String)
   }
 
   override def indexEvents(events: Seq[BankAccountEvent], offset: TimeBasedUUID): Either[Exception, TimeBasedUUID] = {
-    println("index events")
     val inserts = events.map { event =>
       logger.info(offset.value.toString)
       project(event, offset)

@@ -32,7 +32,6 @@ class BankAccountEventProjectorActor(indexer: BankAccountLogExporter)
     context.system.dispatchers.lookup(id = "akka-exercise-blocking-dispatcher")
 
   override def preStart(): Unit = {
-    println("projector init")
     context.system.scheduler.scheduleOnce(readDelay, self, ReadOffset)(system.dispatcher)
   }
 
@@ -40,7 +39,6 @@ class BankAccountEventProjectorActor(indexer: BankAccountLogExporter)
       readJournal: CassandraReadJournal,
       offset: Offset
   ): Source[EventEnvelopeSeq, NotUsed] = {
-    println("source creation")
     readJournal
       .eventsByTag(BankAccountWriterActor.bankAccountDetailsTag, offset)
       .groupedWithin(readBatchSize, readWindow)
@@ -74,8 +72,6 @@ class BankAccountEventProjectorActor(indexer: BankAccountLogExporter)
         val eventStreamMaxOffset: TimeBasedUUID = getMaxOffset(offset2event)
         val events = offset2event map (_._2)
         val originalSender = sender()
-
-        println("event stream")
 
         log.info("({}) Processing batch of {} events", indexer.name, events.size)
         indexer.indexEvents(events, eventStreamMaxOffset) match {
