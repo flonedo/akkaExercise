@@ -9,7 +9,7 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Source
 import bank.AppConfig._
 import bank.actor.ReadJournalStreamManagerActor
-import bank.actor.projector.BankAccountEventProjectorActor.{OffsetRead, ReadOffset}
+import bank.actor.projector.BankAccountEventProjectorActor.ReadOffset
 import bank.actor.projector.EventEnvelopeSeqHandler.EventEnvelopeSeq
 import bank.actor.projector.export.BankAccountLogExporter
 import bank.actor.write.{ActorSharding, BankAccountWriterActor}
@@ -47,16 +47,14 @@ class BankAccountEventProjectorActor(indexer: BankAccountLogExporter)
 
   override def receive: Receive = LoggingReceive {
     case ReadOffset => {
-      indexer.readOffset() match {
-        case None         => self ! OffsetRead(NoOffset)
-        case Some(offset) => self ! OffsetRead(offset)
+      val x = indexer.readOffset() match {
+        case None         => NoOffset
+        case Some(offset) => offset
       }
-    }
 
-    case OffsetRead(offset) => {
-      context.become(eventStreamStarted(offset))
-      startStream(offset)
-      log.info("({}) Stream started! Offset: {}", indexer.name, offset)
+      context.become(eventStreamStarted(x))
+      startStream(x)
+      log.info("({}) Stream started! Offset: {}", indexer.name, x)
     }
     case unknown =>
       log.error("({}) Received unknown message in receiveCommand (sender: {} - message: {})",
@@ -96,5 +94,4 @@ object BankAccountEventProjectorActor {
     Props(new BankAccountEventProjectorActor(indexer))
 
   case object ReadOffset
-  case class OffsetRead(offset: Offset)
 }
