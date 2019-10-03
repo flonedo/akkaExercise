@@ -78,9 +78,7 @@ object BankAccount {
   }
 
   case class Created(iban: String) extends BankAccountEvent {
-    def applyTo(domainEntity: BankAccount): BankAccount = {
-      domainEntity.copy(iban = iban)
-    }
+    def applyTo(domainEntity: BankAccount): BankAccount = domainEntity.copy(iban = iban)
   }
 
 }

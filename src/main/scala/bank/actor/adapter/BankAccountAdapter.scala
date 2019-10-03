@@ -9,9 +9,9 @@ class BankAccountAdapter extends EventAdapter {
 
   val tag = Set(BankAccountWriterActor.bankAccountDetailsTag)
   override def fromJournal(event: Any, manifest: String): EventSeq = event match {
-    case event: BankAccount.Created   => EventSeq.single(event)
-    case event: BankAccount.Deposited => EventSeq.single(event)
-    case event: BankAccount.Withdrawn => EventSeq.single(event)
+    case event: BankAccount.Created   => EventSeq(event)
+    case event: BankAccount.Deposited => EventSeq(event)
+    case event: BankAccount.Withdrawn => EventSeq(event)
   }
 
   override def toJournal(event: Any): Any = event match {
