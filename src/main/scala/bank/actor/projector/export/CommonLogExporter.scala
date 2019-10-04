@@ -9,7 +9,7 @@ import bank.actor.projector.ProjectionIndexer
 import scala.io.Source
 import scala.util.{Failure, Try}
 
-trait CommonExporter[T] extends ProjectionIndexer[T] {
+trait CommonLogExporter[T] extends ProjectionIndexer[T] {
 
   val offsetFilePath: String
 
