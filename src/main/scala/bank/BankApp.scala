@@ -13,11 +13,12 @@ import akka.management.scaladsl.AkkaManagement
 import akka.pattern.ask
 import akka.util.Timeout
 import bank.actor.Messages.Done
-import bank.actor.projector.BankAccountEventProjectorActor
-import bank.actor.projector.export.BankAccountLogExporter
-import bank.actor.write.{ActorSharding, BankAccountWriterActor}
-import bank.domain.BankAccount
+import bank.actor.projector.export.{BankAccountLogExporter, PersonLogExporter}
+import bank.actor.projector.{BankAccountEventProjectorActor, PersonEventProjectorActor}
+import bank.actor.write.{ActorSharding, BankAccountWriterActor, PersonWriterActor}
 import bank.domain.BankAccount.BankAccountCommand
+import bank.domain.Person.PersonCommand
+import bank.domain.{BankAccount, Person}
 import com.typesafe.config.ConfigFactory
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
 
@@ -85,13 +86,13 @@ object BankApp extends HttpApp with ActorSharding with App {
       extractEntityId = BankAccountWriterActor.extractEntityId,
       extractShardId = BankAccountWriterActor.extractShardId
     )
-    /*ClusterSharding(system).start(
+    ClusterSharding(system).start(
       typeName = PersonWriterActor.name,
       entityProps = PersonWriterActor.props(),
       settings = ClusterShardingSettings(system),
       extractEntityId = PersonWriterActor.extractEntityId,
       extractShardId = PersonWriterActor.extractShardId
-    )*/
+    )
   }
 
   private def createClusterSingletonActors(): Unit = {
@@ -102,6 +103,14 @@ object BankApp extends HttpApp with ActorSharding with App {
         settings = ClusterSingletonManagerSettings(system)
       ),
       BankAccountEventProjectorActor.name
+    )
+    system.actorOf(
+      ClusterSingletonManager.props(
+        singletonProps = PersonEventProjectorActor.props(new PersonLogExporter(dbFilePath, offsetFilePath)),
+        terminationMessage = PoisonPill,
+        settings = ClusterSingletonManagerSettings(system)
+      ),
+      PersonEventProjectorActor.name
     )
   }
 
@@ -120,12 +129,35 @@ object BankApp extends HttpApp with ActorSharding with App {
         post {
           entity(as[BankAccount.Withdraw])(forwardRequest)
         }
+      } ~
+      path("createPerson") {
+        post {
+          entity(as[Person.CreatePerson])(personRequest)
+        }
+      } ~
+      path("openBank") {
+        post {
+          entity(as[Person.OpenBankAccount])(personRequest)
+        }
+      } ~
+      path("closeBank") {
+        post {
+          entity(as[Person.CloseBankAccount])(personRequest)
+        }
       }
   }
 
   def forwardRequest[R <: BankAccountCommand]: R => Route =
     (request: R) => {
       onSuccess(accountRegion ? request) {
+        case Done => complete(StatusCodes.OK -> s"${request}")
+        case e    => complete(StatusCodes.BadRequest -> e.toString)
+      }
+    }
+
+  def personRequest[R <: PersonCommand]: R => Route =
+    (request: R) => {
+      onSuccess(personRegion ? request) {
         case Done => complete(StatusCodes.OK -> s"${request}")
         case e    => complete(StatusCodes.BadRequest -> e.toString)
       }
