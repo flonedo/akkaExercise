@@ -1,12 +1,17 @@
 package bank.domain
 
 import bank.domain.Domain.{DomainCommand, DomainEntity, DomainEvent}
+import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
+import io.circe.{Decoder, Encoder}
 
 case class Person(fullName: String, bankAccounts: Vector[BankAccount]) extends DomainEntity
 
 object Person {
 
   val empty = Person("", Vector.empty[BankAccount])
+
+  implicit val dBankAccount: Decoder[BankAccount] = deriveDecoder[BankAccount]
+  implicit val eBankAccount: Encoder[BankAccount] = deriveEncoder[BankAccount]
 
   sealed trait PersonEvent extends DomainEvent[Person] {
     val fullName: String
@@ -16,6 +21,8 @@ object Person {
     val fullName: String
   }
 
+  implicit val dCloseBankAccount: Decoder[CloseBankAccount] = deriveDecoder[CloseBankAccount]
+  implicit val eCloseBankAccount: Encoder[CloseBankAccount] = deriveEncoder[CloseBankAccount]
   case class CloseBankAccount(fullName: String, bankAccount: BankAccount) extends PersonCommand {
     override def applyTo(domainEntity: Person): Either[String, Option[PersonEvent]] = {
       if (fullName == domainEntity.fullName) {
@@ -35,6 +42,8 @@ object Person {
       domainEntity.copy(bankAccounts = domainEntity.bankAccounts.filter(_ != bankAccount))
   }
 
+  implicit val dOpenBankAccount: Decoder[OpenBankAccount] = deriveDecoder[OpenBankAccount]
+  implicit val eOpenBankAccount: Encoder[OpenBankAccount] = deriveEncoder[OpenBankAccount]
   case class OpenBankAccount(fullName: String) extends PersonCommand {
     override def applyTo(domainEntity: Person): Either[String, Option[PersonEvent]] = {
       if (fullName == domainEntity.fullName) {
@@ -53,6 +62,8 @@ object Person {
       )
   }
 
+  implicit val dCreatePerson: Decoder[CreatePerson] = deriveDecoder
+  implicit val eCreatePerson: Encoder[CreatePerson] = deriveEncoder
   case class CreatePerson(fullName: String) extends PersonCommand {
     override def applyTo(domainEntity: Person): Either[String, Option[CreatedPerson]] = {
       domainEntity match {
