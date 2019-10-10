@@ -4,14 +4,15 @@ import bank.domain.Domain.{DomainCommand, DomainEntity, DomainEvent}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import io.circe.{Decoder, Encoder}
 
-case class Person(fullName: String, bankAccounts: Vector[BankAccount]) extends DomainEntity
+case class Person(fullName: String, bankAccounts: Vector[String]) extends DomainEntity
 
 object Person {
 
-  val empty = Person("", Vector.empty[BankAccount])
+  val empty = Person("", Vector.empty[String])
 
-  implicit val dBankAccount: Decoder[BankAccount] = deriveDecoder[BankAccount]
-  implicit val eBankAccount: Encoder[BankAccount] = deriveEncoder[BankAccount]
+  //TODO remove if unused
+  //implicit val dBankAccount: Decoder[BankAccount] = deriveDecoder[BankAccount]
+  //implicit val eBankAccount: Encoder[BankAccount] = deriveEncoder[BankAccount]
 
   sealed trait PersonEvent extends DomainEvent[Person] {
     val fullName: String
@@ -21,13 +22,13 @@ object Person {
     val fullName: String
   }
 
-  implicit val dCloseBankAccount: Decoder[CloseBankAccount] = deriveDecoder[CloseBankAccount]
-  implicit val eCloseBankAccount: Encoder[CloseBankAccount] = deriveEncoder[CloseBankAccount]
-  case class CloseBankAccount(fullName: String, bankAccount: BankAccount) extends PersonCommand {
+  implicit val dCloseBankAccount: Decoder[CloseBankAccount] = deriveDecoder
+  implicit val eCloseBankAccount: Encoder[CloseBankAccount] = deriveEncoder
+  case class CloseBankAccount(fullName: String, iban: String) extends PersonCommand {
     override def applyTo(domainEntity: Person): Either[String, Option[PersonEvent]] = {
       if (fullName == domainEntity.fullName) {
-        if (domainEntity.bankAccounts.contains(bankAccount)) {
-          Right(Some(ClosedBankAccount(fullName, bankAccount)))
+        if (domainEntity.bankAccounts.contains(iban)) {
+          Right(Some(ClosedBankAccount(fullName, iban)))
         } else {
           Right(None)
         }
@@ -37,13 +38,14 @@ object Person {
     }
   }
 
-  case class ClosedBankAccount(fullName: String, bankAccount: BankAccount) extends PersonEvent {
-    override def applyTo(domainEntity: Person): Person =
-      domainEntity.copy(bankAccounts = domainEntity.bankAccounts.filter(_ != bankAccount))
+  case class ClosedBankAccount(fullName: String, iban: String) extends PersonEvent {
+    override def applyTo(domainEntity: Person): Person = {
+      domainEntity.copy(bankAccounts = domainEntity.bankAccounts.filter(_ != iban))
+    }
   }
 
-  implicit val dOpenBankAccount: Decoder[OpenBankAccount] = deriveDecoder[OpenBankAccount]
-  implicit val eOpenBankAccount: Encoder[OpenBankAccount] = deriveEncoder[OpenBankAccount]
+  implicit val dOpenBankAccount: Decoder[OpenBankAccount] = deriveDecoder
+  implicit val eOpenBankAccount: Encoder[OpenBankAccount] = deriveEncoder
   case class OpenBankAccount(fullName: String) extends PersonCommand {
     override def applyTo(domainEntity: Person): Either[String, Option[PersonEvent]] = {
       if (fullName == domainEntity.fullName) {
@@ -55,11 +57,12 @@ object Person {
   }
 
   case class OpenedBankAccount(fullName: String) extends PersonEvent {
-    override def applyTo(domainEntity: Person): Person =
+    override def applyTo(domainEntity: Person): Person = {
+      def iban = java.util.UUID.randomUUID().toString
       domainEntity.copy(
-        bankAccounts = domainEntity.bankAccounts :+ BankAccount(iban = java.util.UUID.randomUUID().toString,
-                                                                balance = 0)
+        bankAccounts = domainEntity.bankAccounts :+ iban
       )
+    }
   }
 
   implicit val dCreatePerson: Decoder[CreatePerson] = deriveDecoder
