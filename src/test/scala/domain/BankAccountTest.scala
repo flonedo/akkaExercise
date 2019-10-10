@@ -31,7 +31,7 @@ class BankAccountTest extends AnyFunSuite {
   test("Deposit a neutral amount") {
     val account = accountWithMoney("test")
     val action = BankAccount.Deposit(account.iban, 0.0).applyTo(account)
-    assert(action.right.get equals None)
+    assert(action.right.get.isEmpty)
   }
 
   test("Deposit a positive amount") {
@@ -50,7 +50,7 @@ class BankAccountTest extends AnyFunSuite {
   test("Withdraw a neutral amount") {
     val account = accountWithMoney("test")
     val action = BankAccount.Withdraw(account.iban, 0.0).applyTo(account)
-    assert(action.right.get equals None)
+    assert(action.right.get.isEmpty)
   }
 
   test("Withdraw a positive amount greater than the balance") {
