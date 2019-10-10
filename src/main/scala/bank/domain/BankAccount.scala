@@ -17,8 +17,9 @@ object BankAccount {
   sealed trait BankAccountCommand extends DomainCommand[BankAccount, BankAccountEvent] {
     val iban: String
   }
-  implicit val dDeposit: Decoder[Deposit] = deriveDecoder[Deposit]
-  implicit val eDeposit: Encoder[Deposit] = deriveEncoder[Deposit]
+
+  implicit val dDeposit: Decoder[Deposit] = deriveDecoder
+  implicit val eDeposit: Encoder[Deposit] = deriveEncoder
   case class Deposit(iban: String, amount: Double) extends BankAccountCommand {
     override def applyTo(domainEntity: BankAccount): Either[String, Option[BankAccountEvent]] =
       if (amount < 0) {
