@@ -4,7 +4,7 @@ import akka.actor.{Actor, ActorLogging, ActorSystem, Props, ReceiveTimeout}
 import akka.cluster.sharding.ShardRegion
 import akka.event.LoggingReceive
 import akka.persistence.{PersistentActor, RecoveryCompleted, SnapshotOffer}
-import bank.actor.Messages.Done
+import bank.actor.Messages.{AccountAlreadyCreated, Done}
 import bank.domain.BankAccount
 import bank.domain.BankAccount.BankAccountCommand
 
@@ -39,12 +39,8 @@ class BankAccountWriterActor() extends Actor with ActorSharding with PersistentA
           }
         }
 
-        case Right(None) => {
-          sender() ! Done
-        }
-        case Left(error) => {
-          sender() ! error
-        }
+        case Right(None) => sender() ! AccountAlreadyCreated
+        case Left(error) => sender() ! error
       }
     }
   }

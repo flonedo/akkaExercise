@@ -5,7 +5,7 @@ import java.util.UUID
 import akka.actor.{ActorSystem, PoisonPill}
 import akka.cluster.sharding.{ClusterSharding, ClusterShardingSettings}
 import akka.cluster.singleton.{ClusterSingletonManager, ClusterSingletonManagerSettings}
-import akka.persistence.query.{NoOffset, Offset, TimeBasedUUID}
+import akka.persistence.query.TimeBasedUUID
 import akka.testkit.{DefaultTimeout, ImplicitSender, TestKit}
 import bank.AppConfig
 import bank.actor.projector.BankAccountEventProjectorActor

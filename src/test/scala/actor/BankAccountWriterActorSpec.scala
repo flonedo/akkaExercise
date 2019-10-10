@@ -4,10 +4,9 @@ import akka.actor.ActorSystem
 import akka.cluster.sharding.{ClusterSharding, ClusterShardingSettings}
 import akka.testkit.{DefaultTimeout, ImplicitSender, TestKit}
 import bank.AppConfig
-import bank.actor.Messages.Done
+import bank.actor.Messages.{AccountAlreadyCreated, Done}
 import bank.actor.write.BankAccountWriterActor
 import bank.domain.BankAccount
-import org.junit.runner.RunWith
 import org.scalatest.wordspec.AnyWordSpecLike
 import org.scalatest.{BeforeAndAfterAll, Inside, Matchers}
 
@@ -36,13 +35,13 @@ class BankAccountWriterActorSpec
 
   "A BankAccountWriterActor" must {
     "perform commands" in {
-      cluster ! BankAccount.Create("name")
+      cluster ! BankAccount.Create("iban1")
       expectMsg(10 seconds, Done)
 
-      cluster ! BankAccount.Deposit("name", 2)
+      cluster ! BankAccount.Deposit("iban1", 2)
       expectMsg(10 seconds, Done)
 
-      cluster ! BankAccount.Withdraw("name", 1)
+      cluster ! BankAccount.Withdraw("iban1", 1)
       expectMsg(10 seconds, Done)
     }
   }
@@ -56,21 +55,21 @@ class BankAccountWriterActorSpec
 
   "A withdraw command" must {
     "be refused if the funds are insufficient" in {
-      cluster ! BankAccount.Create("name")
+      cluster ! BankAccount.Create("iban2")
       expectMsg(10 seconds, Done)
 
-      cluster ! BankAccount.Withdraw("name", 2)
+      cluster ! BankAccount.Withdraw("iban2", 2)
       expectMsg(10 seconds, "Insufficient funds")
     }
   }
 
   "A create command" must {
-    "do nothing if the bank account already exists" in {
-      cluster ! BankAccount.Create("name")
+    "report if the bank account already exists" in {
+      cluster ! BankAccount.Create("iban3")
       expectMsg(10 seconds, Done)
 
-      cluster ! BankAccount.Create("name")
-      expectMsg(10 seconds, Done)
+      cluster ! BankAccount.Create("iban3")
+      expectMsg(10 seconds, AccountAlreadyCreated)
     }
   }
 

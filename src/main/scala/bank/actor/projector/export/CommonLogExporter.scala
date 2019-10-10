@@ -20,7 +20,7 @@ trait CommonLogExporter[T] extends ProjectionIndexer[T] {
         val offsetString = defined.getLines().mkString
         Try(TimeBasedUUID(UUID.fromString(offsetString))) match {
           case uuid if uuid.isSuccess => Some(uuid.get)
-          case Failure(_) => None
+          case Failure(_)             => None
         }
       case _ => None
     }

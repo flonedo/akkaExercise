@@ -115,16 +115,11 @@ object BankApp extends HttpApp with ActorSharding with App {
   }
 
   def routes: Route = {
-    path("create") {
+    path("deposit") {
       post {
-        entity(as[BankAccount.Create])(forwardRequest)
+        entity(as[BankAccount.Deposit])(forwardRequest)
       }
     } ~
-      path("deposit") {
-        post {
-          entity(as[BankAccount.Deposit])(forwardRequest)
-        }
-      } ~
       path("withdraw") {
         post {
           entity(as[BankAccount.Withdraw])(forwardRequest)
@@ -150,7 +145,7 @@ object BankApp extends HttpApp with ActorSharding with App {
   def forwardRequest[R <: BankAccountCommand]: R => Route =
     (request: R) => {
       onSuccess(accountRegion ? request) {
-        case Done => complete(StatusCodes.OK -> s"${request}")
+        case Done => complete(StatusCodes.OK -> s"$request")
         case e    => complete(StatusCodes.BadRequest -> e.toString)
       }
     }
@@ -158,7 +153,7 @@ object BankApp extends HttpApp with ActorSharding with App {
   def personRequest[R <: PersonCommand]: R => Route =
     (request: R) => {
       onSuccess(personRegion ? request) {
-        case Done => complete(StatusCodes.OK -> s"${request}")
+        case Done => complete(StatusCodes.OK -> s"$request")
         case e    => complete(StatusCodes.BadRequest -> e.toString)
       }
     }

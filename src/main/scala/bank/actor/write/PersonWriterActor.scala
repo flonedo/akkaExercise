@@ -3,16 +3,21 @@ package bank.actor.write
 import akka.actor.{Actor, ActorLogging, ActorSystem, Props, ReceiveTimeout}
 import akka.cluster.sharding.ShardRegion
 import akka.event.LoggingReceive
+import akka.pattern.ask
 import akka.persistence.{PersistentActor, RecoveryCompleted, SnapshotOffer}
-import bank.actor.Messages.Done
-import bank.domain.Person
-import bank.domain.Person.PersonCommand
+import akka.util.Timeout
+import bank.AppConfig
+import bank.actor.Messages.{AccountAlreadyCreated, Done}
+import bank.domain.Person.{OpenedBankAccount, PersonCommand}
+import bank.domain.{BankAccount, Person}
 
+import scala.concurrent.Await
 import scala.concurrent.duration._
 
 class PersonWriterActor extends Actor with ActorSharding with PersistentActor with ActorLogging {
 
   override implicit val system: ActorSystem = context.system
+  private implicit val timeout: Timeout = Timeout(AppConfig.askTimeout)
 
   override def persistenceId: String = s"${PersonWriterActor.name}-${self.path.name}"
 
@@ -27,25 +32,34 @@ class PersonWriterActor extends Actor with ActorSharding with PersistentActor wi
   override def receiveCommand: Receive = {
     case personOperation: Person.PersonCommand => {
       personOperation.applyTo(state) match {
-
         case Right(Some(event)) => {
-          persist(event) { _ =>
-            state = update(state, event)
-            log.info(event.toString)
-            if (lastSequenceNr % snapShotInterval == 0 && lastSequenceNr != 0) {
-              saveSnapshot(state)
+          event match {
+            case OpenedBankAccount(_, iban) => {
+              val future = accountRegion ? BankAccount.Create(iban)
+              val result = Await.result(future, timeout.duration)
+              result match {
+                case Done                  => persistEvent(event)
+                case AccountAlreadyCreated => sender ! Done
+                case error                 => sender ! error
+              }
             }
-            sender() ! Done
+            case _ => persistEvent(event)
           }
         }
-
-        case Right(None) => {
-          sender() ! Done
-        }
-        case Left(error) => {
-          sender() ! error
-        }
+        case Right(None) => sender() ! Done
+        case Left(error) => sender() ! error
       }
+    }
+  }
+
+  private def persistEvent(event: Person.PersonEvent): Unit = {
+    persist(event) { _ =>
+      state = update(state, event)
+      log.info(event.toString)
+      if (lastSequenceNr % snapShotInterval == 0 && lastSequenceNr != 0) {
+        saveSnapshot(state)
+      }
+      sender ! Done
     }
   }
 
@@ -58,7 +72,7 @@ class PersonWriterActor extends Actor with ActorSharding with PersistentActor wi
     case event: Person.PersonEvent =>
       state = update(state, event)
     case SnapshotOffer(_, snapshot: Person) => state = snapshot
-    case unknown                                 => log.error(s"Received unknown message in receiveRecover:$unknown")
+    case unknown                            => log.error(s"Received unknown message in receiveRecover:$unknown")
   }
 
 }
@@ -82,7 +96,7 @@ object PersonWriterActor {
       (math.abs(entityId.hashCode()) % numberOfShards).toString
 
     {
-      case m: PersonCommand       => computeShardId(m.fullName)
+      case m: PersonCommand            => computeShardId(m.fullName)
       case ShardRegion.StartEntity(id) => computeShardId(id)
     }
   }

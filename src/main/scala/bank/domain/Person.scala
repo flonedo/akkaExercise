@@ -10,10 +10,6 @@ object Person {
 
   val empty = Person("", Vector.empty[String])
 
-  //TODO remove if unused
-  //implicit val dBankAccount: Decoder[BankAccount] = deriveDecoder[BankAccount]
-  //implicit val eBankAccount: Encoder[BankAccount] = deriveEncoder[BankAccount]
-
   sealed trait PersonEvent extends DomainEvent[Person] {
     val fullName: String
   }
@@ -49,16 +45,16 @@ object Person {
   case class OpenBankAccount(fullName: String) extends PersonCommand {
     override def applyTo(domainEntity: Person): Either[String, Option[PersonEvent]] = {
       if (fullName == domainEntity.fullName) {
-        Right(Some(OpenedBankAccount(fullName)))
+        val iban: String = java.util.UUID.randomUUID.toString
+        Right(Some(OpenedBankAccount(fullName, iban)))
       } else {
         Left("Wrong person")
       }
     }
   }
 
-  case class OpenedBankAccount(fullName: String) extends PersonEvent {
+  case class OpenedBankAccount(fullName: String, iban: String) extends PersonEvent {
     override def applyTo(domainEntity: Person): Person = {
-      def iban = java.util.UUID.randomUUID().toString
       domainEntity.copy(
         bankAccounts = domainEntity.bankAccounts :+ iban
       )
