@@ -4,10 +4,10 @@ import bank.domain.{BankAccount, Person}
 import org.scalatest.EitherValues
 import org.scalatest.funsuite.AnyFunSuite
 
-class TestPerson extends AnyFunSuite with EitherValues {
+class PersonTest extends AnyFunSuite with EitherValues {
 
   def personWithAccount(name: String): Person =
-    Person(name, Vector(BankAccount(scala.util.Random.nextInt().toString, scala.util.Random.nextDouble())))
+    Person(name, Vector(scala.util.Random.nextInt().toString))
 
   def personWithoutAccount(name: String): Person = Person(name, Vector.empty)
 
@@ -47,7 +47,7 @@ class TestPerson extends AnyFunSuite with EitherValues {
     val person = personWithAccount("First, Last")
     val balance = 42
     val account = BankAccount(scala.util.Random.nextInt().toString, balance)
-    val closeAccount = Person.CloseBankAccount(person.fullName, account).applyTo(person)
+    val closeAccount = Person.CloseBankAccount(person.fullName, account.iban).applyTo(person)
 
     assert(closeAccount.right.value.isEmpty, "closing a nonexistent account should result in no events")
   }

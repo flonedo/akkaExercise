@@ -3,7 +3,7 @@ package domain
 import bank.domain.BankAccount
 import org.scalatest.funsuite.AnyFunSuite
 
-class TestBankAccount extends AnyFunSuite {
+class BankAccountTest extends AnyFunSuite {
 
   def accountWithMoney(iban: String): BankAccount = BankAccount(iban, 10000.0)
 
@@ -56,7 +56,7 @@ class TestBankAccount extends AnyFunSuite {
   test("Withdraw a positive amount greater than the balance") {
     val account = accountWithMoney("test")
     val action = BankAccount.Withdraw(account.iban, 100000.0).applyTo(account)
-    assert(action.left.get equals "Not enought money")
+    assert(action.left.get equals "Insufficient funds")
   }
 
   test("Withdraw a positive amount less than the balance") {
@@ -64,51 +64,5 @@ class TestBankAccount extends AnyFunSuite {
     val action = BankAccount.Withdraw(account.iban, 150.0).applyTo(account)
     def event: BankAccount.BankAccountEvent = action.right.get.get
     assert(account.balance - 150.0 == event.applyTo(account).balance)
-  }
-
-  //what are these supposed to test??
-  test("Withdraw money") {
-    def testing(n: Int, account: BankAccount): Unit = {
-      if (n == 0) return
-      //Do action
-      val x = scala.util.Random.nextInt(1000) - scala.util.Random.nextInt(1000)
-      val action = BankAccount.Withdraw(account.iban, x).applyTo(account)
-
-      //Testing
-      if (x > 0) {
-        if (account.balance >= x) {
-          def evento = action.right.get.get
-          assert(account.balance - x == evento.applyTo(account).balance, "Error balance")
-          testing(n - 1, evento.applyTo(account))
-        } else assert(action.left.get equals "Not enought money")
-      } else {
-        if (x == 0) assert(action.right.get equals None)
-        else assert(action.left.get equals "Negative amount")
-        testing(n - 1, account)
-      }
-
-    }
-    testing(100, accountWithMoney("test"))
-  }
-
-  test("Deposit money") {
-    def testing(n: Int, account: BankAccount): Unit = {
-      if (n == 0) return
-      //Do action
-      val x = scala.util.Random.nextInt(1000) - scala.util.Random.nextInt(1000)
-      val action = BankAccount.Deposit(account.iban, x).applyTo(account)
-
-      //Testing
-      if (x > 0) {
-        def evento = action.right.get.get
-        assert(account.balance + x == evento.applyTo(account).balance, "Error balance")
-        testing(n - 1, evento.applyTo(account))
-      } else {
-        if (x == 0) assert(action.right.get equals None)
-        else assert(action.left.get equals "Negative amount")
-        testing(n - 1, account)
-      }
-    }
-    testing(100, accountWithMoney("test"))
   }
 }
