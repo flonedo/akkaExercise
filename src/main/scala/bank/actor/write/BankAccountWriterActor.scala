@@ -10,7 +10,7 @@ import bank.domain.BankAccount.BankAccountCommand
 
 import scala.concurrent.duration._
 
-class BankAccountWriterActor() extends Actor with ActorSharding with PersistentActor with ActorLogging {
+class BankAccountWriterActor extends Actor with ActorSharding with PersistentActor with ActorLogging {
 
   override implicit val system: ActorSystem = context.system
 
@@ -25,10 +25,10 @@ class BankAccountWriterActor() extends Actor with ActorSharding with PersistentA
   }
 
   override def receiveCommand: Receive = {
-    case bankOperation: BankAccount.BankAccountCommand => {
+    case bankOperation: BankAccount.BankAccountCommand =>
       bankOperation.applyTo(state) match {
 
-        case Right(Some(event)) => {
+        case Right(Some(event)) =>
           persist(event) { _ =>
             state = update(state, event)
             log.info(event.toString)
@@ -37,12 +37,12 @@ class BankAccountWriterActor() extends Actor with ActorSharding with PersistentA
             }
             sender() ! Done
           }
-        }
+
 
         case Right(None) => sender() ! AccountAlreadyCreated
         case Left(error) => sender() ! error
       }
-    }
+
   }
 
   protected def update(state: BankAccount, event: BankAccount.BankAccountEvent): BankAccount = event.applyTo(state)
