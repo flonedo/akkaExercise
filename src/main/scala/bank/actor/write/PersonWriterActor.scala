@@ -8,7 +8,7 @@ import akka.persistence.{PersistentActor, RecoveryCompleted, SnapshotOffer}
 import akka.util.Timeout
 import bank.AppConfig
 import bank.actor.Messages.{AccountAlreadyCreated, Done}
-import bank.domain.Person.{OpenedBankAccount, PersonCommand}
+import bank.domain.Person.{OpenedBankAccount, PersonCommand, PersonEvent}
 import bank.domain.{BankAccount, Person}
 
 import scala.concurrent.Await
@@ -30,11 +30,11 @@ class PersonWriterActor extends Actor with ActorSharding with PersistentActor wi
   }
 
   override def receiveCommand: Receive = {
-    case personOperation: Person.PersonCommand => {
+    case personOperation: PersonCommand =>
       personOperation.applyTo(state) match {
-        case Right(Some(event)) => {
+        case Right(Some(event)) =>
           event match {
-            case OpenedBankAccount(_, iban) => {
+            case OpenedBankAccount(_, iban) =>
               val future = accountRegion ? BankAccount.Create(iban)
               val result = Await.result(future, timeout.duration)
               result match {
@@ -42,17 +42,17 @@ class PersonWriterActor extends Actor with ActorSharding with PersistentActor wi
                 case AccountAlreadyCreated => sender ! Done
                 case error                 => sender ! error
               }
-            }
+
             case _ => persistEvent(event)
           }
-        }
+
         case Right(None) => sender() ! Done
         case Left(error) => sender() ! error
       }
-    }
+
   }
 
-  private def persistEvent(event: Person.PersonEvent): Unit = {
+  private def persistEvent(event: PersonEvent): Unit = {
     persist(event) { _ =>
       state = update(state, event)
       log.info(event.toString)
@@ -63,13 +63,13 @@ class PersonWriterActor extends Actor with ActorSharding with PersistentActor wi
     }
   }
 
-  protected def update(state: Person, event: Person.PersonEvent): Person = event.applyTo(state)
+  protected def update(state: Person, event: PersonEvent): Person = event.applyTo(state)
 
   val snapShotInterval = 10
 
   override def receiveRecover: Receive = receivePassivate orElse LoggingReceive {
     case RecoveryCompleted => log.info("Recovery completed!")
-    case event: Person.PersonEvent =>
+    case event: PersonEvent =>
       state = update(state, event)
     case SnapshotOffer(_, snapshot: Person) => state = snapshot
     case unknown                            => log.error(s"Received unknown message in receiveRecover:$unknown")

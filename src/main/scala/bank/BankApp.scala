@@ -145,7 +145,7 @@ object BankApp extends HttpApp with ActorSharding with App {
   def forwardRequest[R <: BankAccountCommand]: R => Route =
     (request: R) => {
       onSuccess(accountRegion ? request) {
-        case Done => complete(StatusCodes.OK -> s"$request")
+        case Done => complete(StatusCodes.OK -> request.toString)
         case e    => complete(StatusCodes.BadRequest -> e.toString)
       }
     }
@@ -153,9 +153,8 @@ object BankApp extends HttpApp with ActorSharding with App {
   def personRequest[R <: PersonCommand]: R => Route =
     (request: R) => {
       onSuccess(personRegion ? request) {
-        case Done => complete(StatusCodes.OK -> s"$request")
+        case Done => complete(StatusCodes.OK -> request.toString)
         case e    => complete(StatusCodes.BadRequest -> e.toString)
       }
     }
-
 }
