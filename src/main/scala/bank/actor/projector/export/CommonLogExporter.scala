@@ -31,7 +31,7 @@ trait CommonLogExporter[T] extends ProjectionIndexer[T] with LazyLogging {
   def writeOffset(offset: TimeBasedUUID): Either[Exception, TimeBasedUUID] = {
     val offsetFw = new FileWriter(offsetFilePath, false)
     try {
-      offsetFw.write(s"${offset.value}")
+      offsetFw.write(offset.value.toString)
       Right(offset)
     } catch {
       case e: Exception => Left(e)
@@ -57,7 +57,7 @@ trait CommonLogExporter[T] extends ProjectionIndexer[T] with LazyLogging {
     val file = new File(eventsFilePath)
     val eventsFw = new FileWriter(file, true)
     try {
-      eventsFw.write(s"$event $offset.value\n")
+      eventsFw.write(event + " " + offset.value.toString + "\n")
       Right(offset)
     } catch {
       case e: Exception => Left(e)
