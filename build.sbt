@@ -49,3 +49,6 @@ scalacOptions ++= Seq(
 )
 
 javacOptions in Compile ++= Seq("-Xlint:unchecked", "-Xlint:deprecation")
+
+fork in Test := true
+parallelExecution in Test := false
