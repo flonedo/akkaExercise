@@ -9,7 +9,7 @@ import akka.util.Timeout
 import bank.AppConfig
 import bank.actor.Messages._
 import bank.domain.BankAccount
-import bank.domain.BankAccount.{BankAccountCommand, BankAccountEvent, Deposit, Withdrawn}
+import bank.domain.BankAccount.{BankAccountCommand, BankAccountEvent, Deposited, Withdrawn}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -38,7 +38,7 @@ class BankAccountWriterActor extends Actor with ActorSharding with PersistentAct
           val future = personRegion ? CheckAccountProperty(event.owner, event.iban)
           future pipeTo self
 
-        case Right(Some(event: Deposit)) =>
+        case Right(Some(event: Deposited)) =>
           context.become(receiveStatus(sender, event))
           val future = personRegion ? CheckAccountProperty(event.owner, event.iban)
           future pipeTo self
