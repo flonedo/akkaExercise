@@ -10,6 +10,14 @@ object Person {
 
   val empty = Person("", Vector.empty[String])
 
+  def checkAccount(domainEntity: Person, owner: String, iban: String): Boolean = {
+    if (domainEntity.fullName == owner) {
+      domainEntity.bankAccounts.contains(iban)
+    } else {
+      false
+    }
+  }
+
   sealed trait PersonEvent extends DomainEvent[Person] {
     val fullName: String
   }

@@ -20,7 +20,7 @@ object BankAccount {
 
   implicit val dDeposit: Decoder[Deposit] = deriveDecoder
   implicit val eDeposit: Encoder[Deposit] = deriveEncoder
-  case class Deposit(iban: String, amount: Double) extends BankAccountCommand {
+  case class Deposit(owner: String, iban: String, amount: Double) extends BankAccountCommand {
     override def applyTo(domainEntity: BankAccount): Either[String, Option[BankAccountEvent]] =
       if (amount < 0) {
         Left("Negative amount")
@@ -28,21 +28,21 @@ object BankAccount {
         Right(None)
       } else {
         if (domainEntity.iban == iban) {
-          Right(Some(Deposited(iban, amount)))
+          Right(Some(Deposited(owner, iban, amount)))
         } else {
           Left("Wrong IBAN")
         }
       }
   }
 
-  case class Deposited(iban: String, amount: Double) extends BankAccountEvent {
+  case class Deposited(owner: String, iban: String, amount: Double) extends BankAccountEvent {
     override def applyTo(domainEntity: BankAccount): BankAccount =
       domainEntity.copy(balance = domainEntity.balance + amount)
   }
 
   implicit val dWithdraw: Decoder[Withdraw] = deriveDecoder[Withdraw]
   implicit val eWithdraw: Encoder[Withdraw] = deriveEncoder[Withdraw]
-  case class Withdraw(iban: String, amount: Double) extends BankAccountCommand {
+  case class Withdraw(owner: String, iban: String, amount: Double) extends BankAccountCommand {
     override def applyTo(domainEntity: BankAccount): Either[String, Option[Withdrawn]] =
       if (amount < 0) {
         Left("Negative amount")
@@ -51,7 +51,7 @@ object BankAccount {
       } else {
         if (domainEntity.iban == iban) {
           if (domainEntity.balance >= amount) {
-            Right(Some(Withdrawn(iban, amount)))
+            Right(Some(Withdrawn(owner, iban, amount)))
           } else {
             Left("Insufficient funds")
           }
@@ -61,7 +61,7 @@ object BankAccount {
       }
   }
 
-  case class Withdrawn(iban: String, amount: Double) extends BankAccountEvent {
+  case class Withdrawn(owner: String, iban: String, amount: Double) extends BankAccountEvent {
     override def applyTo(domainEntity: BankAccount): BankAccount =
       domainEntity.copy(balance = domainEntity.balance - amount)
   }

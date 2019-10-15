@@ -1,18 +1,23 @@
 package bank.actor.write
 
-import akka.actor.{Actor, ActorLogging, ActorSystem, Props, ReceiveTimeout}
+import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props, ReceiveTimeout, Status}
 import akka.cluster.sharding.ShardRegion
 import akka.event.LoggingReceive
+import akka.pattern.{ask, pipe}
 import akka.persistence.{PersistentActor, RecoveryCompleted, SnapshotOffer}
-import bank.actor.Messages.{AccountAlreadyCreated, Done}
+import akka.util.Timeout
+import bank.AppConfig
+import bank.actor.Messages._
 import bank.domain.BankAccount
-import bank.domain.BankAccount.BankAccountCommand
+import bank.domain.BankAccount.{BankAccountCommand, BankAccountEvent, Deposit, Withdrawn}
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
 class BankAccountWriterActor extends Actor with ActorSharding with PersistentActor with ActorLogging {
 
   override implicit val system: ActorSystem = context.system
+  private implicit val timeout: Timeout = Timeout(AppConfig.askTimeout)
 
   override def persistenceId: String = s"${BankAccountWriterActor.name}-${self.path.name}"
 
@@ -28,21 +33,62 @@ class BankAccountWriterActor extends Actor with ActorSharding with PersistentAct
     case bankOperation: BankAccount.BankAccountCommand =>
       bankOperation.applyTo(state) match {
 
-        case Right(Some(event)) =>
-          persist(event) { _ =>
-            state = update(state, event)
-            log.info(event.toString)
-            if (lastSequenceNr % snapShotInterval == 0 && lastSequenceNr != 0) {
-              saveSnapshot(state)
-            }
-            sender() ! Done
+        case Right(Some(event: Withdrawn)) =>
+          context.become(receiveStatus(sender, event))
+          val future = personRegion ? CheckAccountProperty(event.owner, event.iban)
+          future pipeTo self
+
+        case Right(Some(event: Deposit)) =>
+          context.become(receiveStatus(sender, event))
+          val future = personRegion ? CheckAccountProperty(event.owner, event.iban)
+          future pipeTo self
+
+        case Right(Some(event)) => persistEvent(event)
+
+        case Right(None) =>
+          if (bankOperation.isInstanceOf[BankAccount.Create]) {
+            sender() ! AccountAlreadyCreated
+          } else {
+            sender ! Done
           }
-
-
-        case Right(None) => sender() ! AccountAlreadyCreated
         case Left(error) => sender() ! error
       }
+  }
 
+  private def receiveStatus(sender: ActorRef, event: BankAccountEvent): Receive = {
+    case AccountPropertyConfimed =>
+      persistEvent(event, sender)
+      context.unbecome()
+      unstashAll()
+    case AccountPropertyNotConfimed =>
+      sender ! "You do not have account with that iban"
+      context.unbecome()
+      unstashAll()
+    case Status.Failure =>
+      sender ! "Failure"
+      context.unbecome()
+      unstashAll()
+    case c: BankAccountCommand =>
+      stash()
+    case error: String =>
+      context.unbecome()
+      sender ! error
+      unstashAll()
+  }
+
+  private def persistEvent(event: BankAccountEvent, actor: ActorRef): Unit = {
+    persist(event) { _ =>
+      state = update(state, event)
+      log.info(event.toString)
+      if (lastSequenceNr % snapShotInterval == 0 && lastSequenceNr != 0) {
+        saveSnapshot(state)
+      }
+      actor ! Done
+    }
+  }
+
+  private def persistEvent(event: BankAccountEvent): Unit = {
+    persistEvent(event, sender)
   }
 
   protected def update(state: BankAccount, event: BankAccount.BankAccountEvent): BankAccount = event.applyTo(state)

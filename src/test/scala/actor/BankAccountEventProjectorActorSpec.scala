@@ -2,7 +2,7 @@ package actor
 
 import java.util.UUID
 
-import akka.actor.{ActorSystem, PoisonPill}
+import akka.actor.{ActorRef, ActorSystem, PoisonPill}
 import akka.cluster.sharding.{ClusterSharding, ClusterShardingSettings}
 import akka.cluster.singleton.{ClusterSingletonManager, ClusterSingletonManagerSettings}
 import akka.persistence.query.TimeBasedUUID
@@ -25,9 +25,9 @@ class BankAccountEventProjectorActorSpec
     with BeforeAndAfterAll
     with Inside {
 
-  val dbFilePath = AppConfig.dbFilePath
-  val offsetFilePath = AppConfig.offsetFilePath
-  val projector = system.actorOf(
+  val dbFilePath: String = AppConfig.dbFilePath
+  val offsetFilePath: String = AppConfig.offsetFilePath
+  val projector: ActorRef = system.actorOf(
     ClusterSingletonManager.props(
       singletonProps = BankAccountEventProjectorActor.props(new BankAccountLogExporter(dbFilePath, offsetFilePath)),
       terminationMessage = PoisonPill,
@@ -36,7 +36,7 @@ class BankAccountEventProjectorActorSpec
     BankAccountEventProjectorActor.name
   )
 
-  val cluster = ClusterSharding(system).start(
+  val cluster: ActorRef = ClusterSharding(system).start(
     typeName = BankAccountWriterActor.name,
     entityProps = BankAccountWriterActor.props(),
     settings = ClusterShardingSettings(system),
@@ -54,8 +54,8 @@ class BankAccountEventProjectorActorSpec
     "some events are received" should {
       "generate updates" in {
         val event1 = BankAccount.Created("someiban")
-        val event2 = BankAccount.Deposited("someiban", 2)
-        val event3 = BankAccount.Withdrawn("someiban", 1)
+        val event2 = BankAccount.Deposited("owner", "someiban", 2)
+        val event3 = BankAccount.Withdrawn("owner", "someiban", 1)
         val events: Seq[BankAccountEvent] = Seq(event1, event2, event3)
 
         val indexer = new BankAccountLogExporter(dbFilePath, offsetFilePath)

@@ -1,17 +1,17 @@
 package bank.actor.write
 
-import akka.actor.{Actor, ActorLogging, ActorSystem, Props, ReceiveTimeout}
+import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props, ReceiveTimeout, Status}
 import akka.cluster.sharding.ShardRegion
 import akka.event.LoggingReceive
-import akka.pattern.ask
+import akka.pattern.{ask, pipe}
 import akka.persistence.{PersistentActor, RecoveryCompleted, SnapshotOffer}
 import akka.util.Timeout
 import bank.AppConfig
-import bank.actor.Messages.{AccountAlreadyCreated, Done}
+import bank.actor.Messages._
 import bank.domain.Person.{OpenedBankAccount, PersonCommand, PersonEvent}
 import bank.domain.{BankAccount, Person}
 
-import scala.concurrent.Await
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
 class PersonWriterActor extends Actor with ActorSharding with PersistentActor with ActorLogging {
@@ -32,35 +32,59 @@ class PersonWriterActor extends Actor with ActorSharding with PersistentActor wi
   override def receiveCommand: Receive = {
     case personOperation: PersonCommand =>
       personOperation.applyTo(state) match {
+        case Right(Some(event @ OpenedBankAccount(_, iban))) =>
+          context.become(receiveStatus(sender, event))
+          val future = accountRegion ? BankAccount.Create(iban)
+          future pipeTo self
         case Right(Some(event)) =>
-          event match {
-            case OpenedBankAccount(_, iban) =>
-              val future = accountRegion ? BankAccount.Create(iban)
-              val result = Await.result(future, timeout.duration)
-              result match {
-                case Done                  => persistEvent(event)
-                case AccountAlreadyCreated => sender ! Done
-                case error                 => sender ! error
-              }
-
-            case _ => persistEvent(event)
-          }
+          persistEvent(event)
 
         case Right(None) => sender() ! Done
         case Left(error) => sender() ! error
       }
+    case CheckAccountProperty(owner, iban) =>
+      if (Person.checkAccount(state, owner, iban)) {
+        sender ! AccountPropertyConfimed
+      } else {
+        sender ! AccountPropertyNotConfimed
+      }
 
   }
 
-  private def persistEvent(event: PersonEvent): Unit = {
+  private def receiveStatus(sender: ActorRef, event: PersonEvent): Receive = {
+    case Done =>
+      persistEvent(event, sender)
+      context.unbecome()
+      unstashAll()
+    case AccountAlreadyCreated =>
+      sender ! "An account with that iban already exists"
+      context.unbecome()
+      unstashAll()
+    case Status.Failure =>
+      sender ! "Failure"
+      context.unbecome()
+      unstashAll()
+    case c: PersonCommand =>
+      stash()
+    case error: String =>
+      context.unbecome()
+      sender ! error
+      unstashAll()
+  }
+
+  private def persistEvent(event: PersonEvent, actor: ActorRef): Unit = {
     persist(event) { _ =>
       state = update(state, event)
       log.info(event.toString)
       if (lastSequenceNr % snapShotInterval == 0 && lastSequenceNr != 0) {
         saveSnapshot(state)
       }
-      sender ! Done
+      actor ! Done
     }
+  }
+
+  private def persistEvent(event: PersonEvent): Unit = {
+    persistEvent(event, sender)
   }
 
   protected def update(state: Person, event: PersonEvent): Person = event.applyTo(state)
@@ -88,7 +112,8 @@ object PersonWriterActor {
   def props(): Props = Props(new PersonWriterActor())
 
   val extractEntityId: ShardRegion.ExtractEntityId = {
-    case m: PersonCommand => (m.fullName, m)
+    case m: PersonCommand        => (m.fullName, m)
+    case c: CheckAccountProperty => (c.owner, c)
   }
 
   val extractShardId: ShardRegion.ExtractShardId = {
@@ -97,6 +122,7 @@ object PersonWriterActor {
 
     {
       case m: PersonCommand            => computeShardId(m.fullName)
+      case c: CheckAccountProperty     => computeShardId(c.owner)
       case ShardRegion.StartEntity(id) => computeShardId(id)
     }
   }
