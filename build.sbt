@@ -5,13 +5,13 @@ version := "0.1"
 scalaVersion := "2.12.10"
 
 libraryDependencies ++= Seq(
-  "com.typesafe.akka" %% "akka-cluster-sharding" % "2.5.25",
-  "com.typesafe.akka" %% "akka-cluster-tools" % "2.5.25",
-  "com.typesafe.akka" %% "akka-remote" % "2.5.25",
-  "com.typesafe.akka" %% "akka-actor" % "2.5.25",
-  "com.typesafe.akka" %% "akka-slf4j" % "2.5.25",
-  "com.typesafe.akka" %% "akka-discovery" % "2.5.25",
-  "com.typesafe.akka" %% "akka-persistence-query" % "2.5.25",
+  "com.typesafe.akka" %% "akka-cluster-sharding" % "2.5.26",
+  "com.typesafe.akka" %% "akka-cluster-tools" % "2.5.26",
+  "com.typesafe.akka" %% "akka-remote" % "2.5.26",
+  "com.typesafe.akka" %% "akka-actor" % "2.5.26",
+  "com.typesafe.akka" %% "akka-slf4j" % "2.5.26",
+  "com.typesafe.akka" %% "akka-discovery" % "2.5.26",
+  "com.typesafe.akka" %% "akka-persistence-query" % "2.5.26",
   "com.typesafe.akka" %% "akka-persistence-cassandra" % "0.99",
   "com.typesafe.akka" %% "akka-persistence-cassandra-launcher" % "0.99",
   "com.lightbend.akka.management" %% "akka-management-cluster-bootstrap" % "1.0.3",
@@ -30,8 +30,10 @@ libraryDependencies ++= Seq(
   "io.circe" %% "circe-core" % "0.12.1",
   "io.circe" %% "circe-generic" % "0.12.1",
   "com.github.dnvriend" %% "akka-persistence-inmemory" % "2.5.15.2" % Test,
-  "com.typesafe.akka" %% "akka-testkit" % "2.5.25" % Test,
+  "com.typesafe.akka" %% "akka-testkit" % "2.5.26" % Test,
   "org.scalatest" %% "scalatest" % "3.0.8" % Test,
+  "com.typesafe.akka" %% "akka-http-testkit" % "10.1.10" % Test,
+  "com.typesafe.akka" %% "akka-stream-testkit" % "2.5.26" % Test,
   "org.scalatestplus" %% "scalatestplus-junit" % "1.0.0-SNAP9" % Test
 )
 

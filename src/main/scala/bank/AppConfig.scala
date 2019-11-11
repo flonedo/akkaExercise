@@ -30,7 +30,7 @@ object AppConfig {
   lazy val readWindow: FiniteDuration = readSideCfg getDuration "batch.window"
   lazy val readDelay: FiniteDuration = readSideCfg getDuration "delay"
 
-  val dbFilePath = "db.csv"
-  val offsetFilePath = "offset.csv"
+  lazy val dbFilePath = "db.csv"
+  lazy val offsetFilePath = "offset.csv"
 
 }

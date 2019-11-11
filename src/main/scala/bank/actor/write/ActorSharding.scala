@@ -9,5 +9,6 @@ trait ActorSharding {
   implicit val system: ActorSystem
 
   def accountRegion: ActorRef = ClusterSharding(system).shardRegion("bank-account-writer-actor")
-  def personRegion: ActorRef = ClusterSharding(system).shardRegion("person-writer-actor")
+  def websocketRegion: ActorRef = ClusterSharding(system).shardRegion("websocket-handler-actor")
+  //def personRegion: ActorRef = ClusterSharding(system).shardRegion("person-writer-actor")
 }

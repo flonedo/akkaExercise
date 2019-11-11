@@ -4,7 +4,9 @@ import java.io.{File, FileWriter}
 import java.util.UUID
 
 import akka.persistence.query.TimeBasedUUID
+import bank.actor.Notify
 import bank.actor.projector.ProjectionIndexer
+import bank.actor.write.ActorSharding
 import bank.domain.BankAccount.BankAccountEvent
 import com.typesafe.scalalogging.LazyLogging
 
@@ -46,8 +48,10 @@ class BankAccountLogExporter(eventsFilePath: String, offsetFilePath: String)
     }
     val res: Either[Exception, TimeBasedUUID] = inserts.reduceLeft((x, y) => if (x.isLeft) x else y)
     res match {
-      case Right(value) => writeOffset(offset)
-      case Left(error)  => ()
+      case Right(value) =>
+        writeOffset(offset)
+
+      case Left(error) => ()
     }
     res
   }

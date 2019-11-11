@@ -17,8 +17,10 @@ object BankAccount {
   sealed trait BankAccountCommand extends DomainCommand[BankAccount, BankAccountEvent] {
     val iban: String
   }
+
   implicit val dDeposit: Decoder[Deposit] = deriveDecoder[Deposit]
   implicit val eDeposit: Encoder[Deposit] = deriveEncoder[Deposit]
+
   case class Deposit(iban: String, amount: Double) extends BankAccountCommand {
     override def applyTo(domainEntity: BankAccount): Either[String, Option[BankAccountEvent]] =
       if (amount < 0) {
@@ -41,6 +43,7 @@ object BankAccount {
 
   implicit val dWithdraw: Decoder[Withdraw] = deriveDecoder[Withdraw]
   implicit val eWithdraw: Encoder[Withdraw] = deriveEncoder[Withdraw]
+
   case class Withdraw(iban: String, amount: Double) extends BankAccountCommand {
     override def applyTo(domainEntity: BankAccount): Either[String, Option[Withdrawn]] =
       if (amount < 0) {
@@ -67,6 +70,7 @@ object BankAccount {
 
   implicit val dCreate: Decoder[Create] = deriveDecoder[Create]
   implicit val eCreate: Encoder[Create] = deriveEncoder[Create]
+
   case class Create(iban: String) extends BankAccountCommand {
     def applyTo(domainEntity: BankAccount): Either[String, Option[Created]] = {
       domainEntity match {

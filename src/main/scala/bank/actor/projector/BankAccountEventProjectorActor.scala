@@ -8,7 +8,7 @@ import akka.persistence.query.{NoOffset, Offset, TimeBasedUUID}
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Source
 import bank.AppConfig._
-import bank.actor.ReadJournalStreamManagerActor
+import bank.actor.{Notify, ReadJournalStreamManagerActor}
 import bank.actor.projector.BankAccountEventProjectorActor.ReadOffset
 import bank.actor.projector.EventEnvelopeSeqHandler.EventEnvelopeSeq
 import bank.actor.projector.export.BankAccountLogExporter
@@ -77,6 +77,11 @@ class BankAccountEventProjectorActor(indexer: BankAccountLogExporter)
             log.info("({}) Indexing operation successfully completed! Offset: {}", indexer.name, eventStreamMaxOffset)
             context.become(eventStreamStarted(eventStreamMaxOffset))
             originalSender ! AckMessage
+            events.foreach { e =>
+              websocketRegion ! Notify(e.iban, e.toString)
+              log.info("({}) Projection notified to websocket Id: {}", e.iban)
+
+            }
 
           case Left(exception) =>
             log.error(exception, "({}) Indexing operation failed", indexer.name)

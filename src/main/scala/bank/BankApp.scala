@@ -7,27 +7,34 @@ import akka.cluster.singleton.{ClusterSingletonManager, ClusterSingletonManagerS
 import akka.dispatch.MessageDispatcher
 import akka.event.LoggingAdapter
 import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.ws.Message
 import akka.http.scaladsl.server.{HttpApp, Route}
 import akka.management.cluster.bootstrap.ClusterBootstrap
 import akka.management.scaladsl.AkkaManagement
 import akka.pattern.ask
+import akka.stream.scaladsl.{Flow, Keep, Sink, Source, StreamRefs}
+import akka.stream.{ActorMaterializer, OverflowStrategy, SourceRef}
 import akka.util.Timeout
 import bank.actor.Messages.Done
+import bank.actor.{Opened, WebsocketHandlerActor}
 import bank.actor.projector.BankAccountEventProjectorActor
 import bank.actor.projector.export.BankAccountLogExporter
 import bank.actor.write.{ActorSharding, BankAccountWriterActor}
 import bank.domain.BankAccount
 import bank.domain.BankAccount.BankAccountCommand
+import bank.domain.WebsocketConnection.OpenConnection
 import com.typesafe.config.ConfigFactory
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
 
-import scala.concurrent.Await
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
+import scala.util.{Failure, Success}
 
 /*** sbt -Denv=local run ***/
 object BankApp extends HttpApp with ActorSharding with App {
 
   override implicit val system: ActorSystem = ActorSystem(AppConfig.serviceName, ConfigFactory.load())
+  implicit val materializer = ActorMaterializer()
 
   private implicit val scheduler: Scheduler = system.scheduler
 
@@ -40,8 +47,6 @@ object BankApp extends HttpApp with ActorSharding with App {
 
   private implicit val blockingDispatcher: MessageDispatcher =
     system.dispatchers.lookup(id = "akka-exercise-blocking-dispatcher")
-
-  //TODO find the reason why recover doesn't revive the prersistent actors from cassandra
 
   startSystem()
 
@@ -85,6 +90,13 @@ object BankApp extends HttpApp with ActorSharding with App {
       extractEntityId = BankAccountWriterActor.extractEntityId,
       extractShardId = BankAccountWriterActor.extractShardId
     )
+    ClusterSharding(system).start(
+      typeName = WebsocketHandlerActor.name,
+      entityProps = WebsocketHandlerActor.props(),
+      settings = ClusterShardingSettings(system),
+      extractEntityId = WebsocketHandlerActor.extractEntityId,
+      extractShardId = WebsocketHandlerActor.extractShardId
+    )
     /*ClusterSharding(system).start(
       typeName = PersonWriterActor.name,
       entityProps = PersonWriterActor.props(),
@@ -120,8 +132,22 @@ object BankApp extends HttpApp with ActorSharding with App {
         post {
           entity(as[BankAccount.Withdraw])(forwardRequest)
         }
+      } ~
+      path("socket" / connectionId) { connectionId =>
+        val sink = Sink.ignore
+        onSuccess(websocketRegion ? OpenConnection(connectionId.toString)) {
+          case Opened(Some(ref)) =>
+            val source = ref.source
+            val flow = Flow.fromSinkAndSourceCoupledMat(sink, source)(Keep.both)
+            handleWebSocketMessages(flow)
+          case Failure(exception: Exception) => complete(StatusCodes.BadRequest -> exception.toString)
+        }
       }
   }
+
+  //perché non va niente? souce e sink sono forse invertiti??
+
+  def connectionId: BankApp.Segment.type = Segment
 
   def forwardRequest[R <: BankAccountCommand]: R => Route =
     (request: R) => {
@@ -130,5 +156,4 @@ object BankApp extends HttpApp with ActorSharding with App {
         case e    => complete(StatusCodes.BadRequest -> e.toString)
       }
     }
-
 }
