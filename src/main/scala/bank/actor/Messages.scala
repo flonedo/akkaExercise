@@ -11,5 +11,3 @@ object Messages {
 case class Notify(id: String, message: String)
 
 case class Opened(ref: Option[SourceRef[Message]])
-
-case class Close(id: String)

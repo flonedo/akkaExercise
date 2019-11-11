@@ -15,13 +15,13 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Flow, Keep, Sink}
 import akka.util.Timeout
 import bank.actor.Messages.Done
+import bank.actor.WebsocketHandlerActor.{CloseConnection, OpenConnection}
 import bank.actor.projector.BankAccountEventProjectorActor
 import bank.actor.projector.export.BankAccountLogExporter
 import bank.actor.write.{ActorSharding, BankAccountWriterActor}
-import bank.actor.{Close, Opened, WebsocketHandlerActor}
+import bank.actor.{Opened, WebsocketHandlerActor}
 import bank.domain.BankAccount
 import bank.domain.BankAccount.BankAccountCommand
-import bank.domain.WebsocketConnection.OpenConnection
 import com.typesafe.config.ConfigFactory
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
 
@@ -155,7 +155,7 @@ object BankApp extends HttpApp with ActorSharding with App {
     }
 
   def killActor(id: String): Unit = {
-    val close = websocketRegion ? Close(id)
+    val close = websocketRegion ? CloseConnection(id)
     close.onComplete {
       case Success(_) => complete(StatusCodes.OK)
       case Failure(_) => complete(StatusCodes.ImATeapot)
