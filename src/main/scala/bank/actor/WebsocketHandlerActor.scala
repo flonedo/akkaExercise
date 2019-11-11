@@ -7,10 +7,12 @@ import akka.pattern.pipe
 import akka.stream.scaladsl.{Keep, Sink, Source, StreamRefs}
 import akka.stream.{ActorMaterializer, OverflowStrategy, SourceRef}
 import bank.actor.Messages.Done
+import bank.actor.WebsocketConnectionActor.{Stopped, Update}
 import bank.actor.WebsocketHandlerActor.{CloseConnection, OpenConnection}
 import bank.actor.write.ActorSharding
 import org.reactivestreams.Publisher
 
+import scala.collection.mutable.Map
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
@@ -21,53 +23,38 @@ class WebsocketHandlerActor() extends Actor with ActorSharding with ActorLogging
 
   implicit val materializer = ActorMaterializer()
 
-  private val bufferSize = 1000
-
-  var id: Option[String] = None
-  private var stream: Option[(ActorRef, Publisher[Message])] = None
-
-  context.setReceiveTimeout(60.seconds)
+  var tenantId: Option[String] = None
+  private var openConnections: Map[String, ActorRef] = Map.empty
 
   override def receive: Receive = {
-    case OpenConnection(connId) => {
-      if (id.isEmpty) {
-        id = Some(connId)
-        stream = Some(
-          Source
-            .actorRef[Message](bufferSize, OverflowStrategy.fail)
-            .toMat(Sink.asPublisher(fanout = false))(Keep.both)
-            .run()
-        )
-        val ref: Future[SourceRef[Message]] = Source.fromPublisher(stream.get._2).runWith(StreamRefs.sourceRef())
-        ref.map(r => Opened(Some(r))).pipeTo(sender())
-        log.info("({}) Websocket started! Id: {}", id)
-      } else {
-        sender() ! Opened(None)
-      }
+    case newConnection: OpenConnection => {
+      if (tenantId.isEmpty) tenantId = Some(newConnection.tenantId)
+      val connActor = context.actorOf(Props(new WebsocketConnectionActor(newConnection.connectionId)))
+      openConnections += (newConnection.connectionId -> connActor)
+      connActor.forward(newConnection)
+      log.info("({}) Websocket started! connection id: {}", tenantId, newConnection.connectionId)
     }
     case Notify(id: String, m: String) => {
       log.info("({}) Received update: {}", m)
-      if (stream.nonEmpty) stream.get._1 ! TextMessage.apply(m)
-    }
-    case CloseConnection(_) =>
-      sender() ! Done
-      log.info("({}) Killed websocket actor! Id: {}", id.getOrElse(""))
-      context.stop(self)
-    case ReceiveTimeout =>
-      log.info("({}) Killed websocket actor! Id: {}", id)
-      if (stream.nonEmpty) {
-        stream.get._1 ! TextMessage.apply("killed")
-        context.stop(stream.get._1)
+      openConnections.foreach { conn =>
+        conn._2 ! Update(TextMessage.apply(m))
       }
-      context.stop(self)
+    }
+    case CloseConnection(_, id) =>
+      val connectionToKill = openConnections.get(id)
+      context.stop(connectionToKill.get)
+      log.info("({}) Killed websocket actor! Id: {}", tenantId.getOrElse(""))
+      sender() ! Done
+    case Stopped(id) =>
+      openConnections.remove(id)
   }
 }
 
 object WebsocketHandlerActor {
 
-  case class OpenConnection(connectionId: String)
+  case class OpenConnection(tenantId: String, connectionId: String)
 
-  case class CloseConnection(id: String)
+  case class CloseConnection(tenantId: String, id: String)
 
   val numberOfShards = 100
 
@@ -76,9 +63,9 @@ object WebsocketHandlerActor {
   def props(): Props = Props(new WebsocketHandlerActor())
 
   val extractEntityId: ShardRegion.ExtractEntityId = {
-    case m: OpenConnection  => (m.connectionId, m)
-    case m: Notify          => (m.id, m)
-    case m: CloseConnection => (m.id, m)
+    case m: OpenConnection  => (m.tenantId, m)
+    case m: Notify          => (m.tenantId, m)
+    case m: CloseConnection => (m.tenantId, m)
   }
 
   val extractShardId: ShardRegion.ExtractShardId = {
@@ -87,9 +74,9 @@ object WebsocketHandlerActor {
 
     {
       case m: OpenConnection           => computeShardId(m.connectionId)
-      case m: Notify                   => computeShardId(m.id)
+      case m: Notify                   => computeShardId(m.tenantId)
       case ShardRegion.StartEntity(id) => computeShardId(id)
-      case CloseConnection(id)         => computeShardId(id)
+      case m: CloseConnection          => computeShardId(m.tenantId)
     }
   }
 

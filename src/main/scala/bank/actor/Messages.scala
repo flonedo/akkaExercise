@@ -8,6 +8,6 @@ object Messages {
   case object Done
 }
 
-case class Notify(id: String, message: String)
+case class Notify(tenantId: String, message: String)
 
 case class Opened(ref: Option[SourceRef[Message]])

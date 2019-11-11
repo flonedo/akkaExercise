@@ -78,7 +78,7 @@ class BankAccountEventProjectorActor(indexer: BankAccountLogExporter)
             context.become(eventStreamStarted(eventStreamMaxOffset))
             originalSender ! AckMessage
             events.foreach { e =>
-              websocketRegion ! Notify(e.iban, e.toString)
+              websocketRegion ! Notify("Tenant", e.toString)
               log.info("({}) Projection notified to websocket Id: {}", e.iban)
 
             }
