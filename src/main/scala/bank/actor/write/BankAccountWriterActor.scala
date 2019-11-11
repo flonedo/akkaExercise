@@ -1,9 +1,10 @@
-package bank.actor
+package bank.actor.write
 
-import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
+import akka.actor.{Actor, ActorLogging, ActorSystem, Props, ReceiveTimeout}
 import akka.cluster.sharding.ShardRegion
-import akka.persistence.{PersistentActor, SnapshotOffer}
-import bank.actor.BankAccountWriterActor.Shutdown
+import akka.event.LoggingReceive
+import akka.persistence.{PersistentActor, RecoveryCompleted, SnapshotOffer}
+import bank.actor.Messages.Done
 import bank.domain.BankAccount
 import bank.domain.BankAccount.BankAccountCommand
 
@@ -18,6 +19,10 @@ class BankAccountWriterActor() extends Actor with ActorSharding with PersistentA
   var state: BankAccount = BankAccount.empty
 
   context.setReceiveTimeout(120.seconds)
+  private def receivePassivate: Receive = {
+    case ReceiveTimeout        => context.parent ! ShardRegion.Passivate
+    case ShardRegion.Passivate => context.stop(self)
+  }
 
   override def receiveCommand: Receive = {
     case bankOperation: BankAccount.BankAccountCommand => {
@@ -30,17 +35,17 @@ class BankAccountWriterActor() extends Actor with ActorSharding with PersistentA
             if (lastSequenceNr % snapShotInterval == 0 && lastSequenceNr != 0) {
               saveSnapshot(state)
             }
-            sender() ! "Done"
+            sender() ! Done
           }
         }
 
-        case Right(None) => sender() ! "Done"
-        case Left(error) => sender() ! error
+        case Right(None) => {
+          sender() ! Done
+        }
+        case Left(error) => {
+          sender() ! error
+        }
       }
-    }
-
-    case Shutdown => {
-      context.system.stop(self)
     }
   }
 
@@ -48,24 +53,25 @@ class BankAccountWriterActor() extends Actor with ActorSharding with PersistentA
 
   val snapShotInterval = 10
 
-  override val receiveRecover: Receive = {
-
-    case event: BankAccount.BankAccountEvent => update(state, event)
-
+  override def receiveRecover: Receive = receivePassivate orElse LoggingReceive {
+    case RecoveryCompleted => log.info("Recovery completed!")
+    case event: BankAccount.BankAccountEvent =>
+      state = update(state, event)
     case SnapshotOffer(_, snapshot: BankAccount) => state = snapshot
+    case unknown                                 => log.error(s"Received unknown message in receiveRecover:$unknown")
   }
 
 }
 
 object BankAccountWriterActor {
 
-  case object Shutdown
-
   val numberOfShards = 100
 
   val name = "bank-account-writer-actor"
 
-  def props(bankAccount: BankAccount): Props = Props(new BankAccountWriterActor(bankAccount))
+  val bankAccountDetailsTag: String = "bank-account"
+
+  def props(): Props = Props(new BankAccountWriterActor())
 
   val extractEntityId: ShardRegion.ExtractEntityId = {
     case m: BankAccountCommand => (m.iban, m)

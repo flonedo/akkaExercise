@@ -1,10 +1,11 @@
-package bank.actor
+package bank.actor.write
 
-import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, PoisonPill, Props}
+import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
 import akka.cluster.sharding.ShardRegion
 import akka.persistence.{PersistentActor, SnapshotOffer}
+import bank.actor.Messages.Done
+import bank.domain.Person
 import bank.domain.Person.PersonCommand
-import bank.domain.{BankAccount, Person}
 
 import scala.concurrent.duration._
 
@@ -22,43 +23,29 @@ class PersonWriterActor() extends Actor with ActorSharding with PersistentActor 
     case personOperation: Person.PersonCommand => {
       personOperation.applyTo(state) match {
 
-        case Right(Some(event: Person.OpenedBankAccount)) => {
-          persist(event) { _ =>
-            state = update(state, event)
-            log.info(event.toString)
-            system.actorOf(
-              BankAccountWriterActor.props(BankAccount(state.bankAccounts.last.iban, state.bankAccounts.last.balance))
-            )
-            if (lastSequenceNr % snapShotInterval == 0 && lastSequenceNr != 0) {
-              saveSnapshot(state)
-              sender() ! "Done"
-            }
-          }
-        }
-
-        case Right(Some(event: Person.ClosedBankAccount)) => {
+        case Right(Some(event: Person.PersonEvent)) => {
           persist(event) { _ =>
             state = update(state, event)
             log.info(event.toString)
             if (lastSequenceNr % snapShotInterval == 0 && lastSequenceNr != 0) {
               saveSnapshot(state)
-              sender() ! "Done"
+              sender() ! Done
             }
           }
         }
 
         case Right(None) => {
-          sender() ! "Done"
+          sender() ! Done
         }
 
-        case Left(_) => {
-          sender() ! _
+        case Left(error) => {
+          sender() ! error
         }
       }
     }
   }
 
-  protected def update(person: Person, event: Person.PersonEvent): Person = event.applyTo(person)
+  protected def update(state: Person, event: Person.PersonEvent): Person = event.applyTo(state)
 
   val snapShotInterval = 10
 
@@ -76,7 +63,7 @@ object PersonWriterActor {
 
   val name = "person-writer-actor"
 
-  def props(person: Person): Props = Props(new PersonWriterActor(person))
+  def props(): Props = Props(new PersonWriterActor())
 
   val extractEntityId: ShardRegion.ExtractEntityId = {
     case m: PersonCommand => (m.fullName, m)

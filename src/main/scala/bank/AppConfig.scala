@@ -1,8 +1,7 @@
-package it.warda.seecommerce
+package bank
 
 import com.typesafe.config.{Config, ConfigFactory}
 
-import scala.collection.JavaConverters._
 import scala.concurrent.duration.FiniteDuration
 import scala.language.implicitConversions
 
@@ -19,11 +18,19 @@ object AppConfig {
   lazy val serviceInterface: String = config.getString("http.interface")
   lazy val servicePort: Int = config.getInt("http.port")
 
-
   /** akka management k8s */
   private val discoveryCfg: Config = config getConfig "akka.management.cluster.bootstrap.contact-point-discovery"
   lazy val akkaClusterBootstrapDiscoveryMethod: String = discoveryCfg getString "discovery-method"
   lazy val akkaClusterBootstrapServiceName: String = discoveryCfg getString "service-name"
   lazy val akkaClusterBootstrapKubernetes: Boolean = akkaClusterBootstrapDiscoveryMethod == "kubernetes-api"
+
+  /** read stream-consumer configs */
+  private val readSideCfg: Config = config getConfig "read-side"
+  lazy val readBatchSize: Int = 1 //readSideCfg getInt "batch.size"
+  lazy val readWindow: FiniteDuration = readSideCfg getDuration "batch.window"
+  lazy val readDelay: FiniteDuration = readSideCfg getDuration "delay"
+
+  lazy val dbFilePath = "db.csv"
+  lazy val offsetFilePath = "offset.csv"
 
 }
