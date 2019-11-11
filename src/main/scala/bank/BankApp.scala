@@ -7,26 +7,25 @@ import akka.cluster.singleton.{ClusterSingletonManager, ClusterSingletonManagerS
 import akka.dispatch.MessageDispatcher
 import akka.event.LoggingAdapter
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.model.ws.Message
 import akka.http.scaladsl.server.{HttpApp, Route}
 import akka.management.cluster.bootstrap.ClusterBootstrap
 import akka.management.scaladsl.AkkaManagement
 import akka.pattern.ask
-import akka.stream.scaladsl.{Flow, Keep, Sink, Source, StreamRefs}
-import akka.stream.{ActorMaterializer, OverflowStrategy, SourceRef}
+import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.{Flow, Keep, Sink}
 import akka.util.Timeout
 import bank.actor.Messages.Done
-import bank.actor.{Opened, WebsocketHandlerActor}
 import bank.actor.projector.BankAccountEventProjectorActor
 import bank.actor.projector.export.BankAccountLogExporter
 import bank.actor.write.{ActorSharding, BankAccountWriterActor}
+import bank.actor.{Close, Opened, WebsocketHandlerActor}
 import bank.domain.BankAccount
 import bank.domain.BankAccount.BankAccountCommand
 import bank.domain.WebsocketConnection.OpenConnection
 import com.typesafe.config.ConfigFactory
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
 
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
@@ -134,7 +133,7 @@ object BankApp extends HttpApp with ActorSharding with App {
         }
       } ~
       path("socket" / connectionId) { connectionId =>
-        val sink = Sink.ignore
+        val sink = Sink.onComplete(_ => killActor(connectionId.toString))
         onSuccess(websocketRegion ? OpenConnection(connectionId.toString)) {
           case Opened(Some(ref)) =>
             val source = ref.source
@@ -145,8 +144,6 @@ object BankApp extends HttpApp with ActorSharding with App {
       }
   }
 
-  //perché non va niente? souce e sink sono forse invertiti??
-
   def connectionId: BankApp.Segment.type = Segment
 
   def forwardRequest[R <: BankAccountCommand]: R => Route =
@@ -156,4 +153,12 @@ object BankApp extends HttpApp with ActorSharding with App {
         case e    => complete(StatusCodes.BadRequest -> e.toString)
       }
     }
+
+  def killActor(id: String): Unit = {
+    val close = websocketRegion ? Close(id)
+    close.onComplete {
+      case Success(_) => complete(StatusCodes.OK)
+      case Failure(_) => complete(StatusCodes.ImATeapot)
+    }
+  }
 }

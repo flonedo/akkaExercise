@@ -14,7 +14,7 @@ case class OpenWebsocketConnection(connectionId: String) extends WebsocketConnec
   implicit val system: ActorSystem = BankApp.system
   implicit val materializer = ActorMaterializer()
 
-  val bufferSize = 1000
+  private val bufferSize = 1000
   val (down, publisher) =
     Source.actorRef[Message](bufferSize, OverflowStrategy.fail).toMat(Sink.asPublisher(fanout = false))(Keep.both).run()
   //Source.fromPublisher(publisher).runWith(StreamRefs.sourceRef())
@@ -39,8 +39,9 @@ object WebsocketConnection {
       domainEntity match {
         case EmptyWebsocketConnection =>
           Right(Some(ConnectionOpened(connectionId)))
-        case OpenWebsocketConnection(id) if id == connectionId => Right(None)
-        case _                                                 => Left("error: connection is already initialized")
+        case OpenWebsocketConnection(id) if id == connectionId =>
+          Right(None) //Right(Some(ConnectionOpened(connectionId)))
+        case _ => Left("error: connection is already initialized")
       }
     }
   }
