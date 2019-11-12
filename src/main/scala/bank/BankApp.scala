@@ -133,10 +133,11 @@ object BankApp extends HttpApp with ActorSharding with App {
         }
       } ~
       path("socket" / connectionId) { connectionId =>
-        val sink = Sink.onComplete(_ => killActor(connectionId.toString))
+        val sink = Sink.onComplete(_ => killActor("Tenant", connectionId.toString))
         onSuccess(websocketRegion ? OpenConnection("Tenant", connectionId.toString)) {
           case Opened(Some(ref)) =>
             val source = ref.source
+            println(source)
             val flow = Flow.fromSinkAndSourceCoupledMat(sink, source)(Keep.both)
             handleWebSocketMessages(flow)
           case Failure(exception: Exception) => complete(StatusCodes.BadRequest -> exception.toString)
@@ -154,8 +155,8 @@ object BankApp extends HttpApp with ActorSharding with App {
       }
     }
 
-  def killActor(id: String): Unit = {
-    val close = websocketRegion ? CloseConnection("Tenant", id)
+  def killActor(tenantId: String, id: String): Unit = {
+    val close = websocketRegion ? CloseConnection(tenantId, id)
     close.onComplete {
       case Success(_) => complete(StatusCodes.OK)
       case Failure(_) => complete(StatusCodes.ImATeapot)
