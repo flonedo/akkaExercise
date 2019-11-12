@@ -1,96 +1,69 @@
 package bank.actor
 
-import akka.actor.{Actor, ActorLogging, ActorSystem, PoisonPill, Props, ReceiveTimeout}
+import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
 import akka.cluster.sharding.ShardRegion
-import akka.http.scaladsl.model.ws.{Message, TextMessage}
-import akka.pattern.pipe
-import akka.stream.scaladsl.{Source, StreamRefs}
-import akka.stream.{ActorMaterializer, SourceRef}
+import akka.http.scaladsl.model.ws.TextMessage
+import akka.stream.ActorMaterializer
 import bank.actor.Messages.Done
+import bank.actor.WebsocketConnectionActor.{Stopped, Update}
+import bank.actor.WebsocketHandlerActor.{CloseConnection, OpenConnection}
 import bank.actor.write.ActorSharding
-import bank.domain.WebsocketConnection.WebsocketCommand
-import bank.domain.{EmptyWebsocketConnection, OpenWebsocketConnection, WebsocketConnection}
 
-import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.collection.mutable.Map
 
-class WebsocketHandlerActor extends Actor with ActorSharding with ActorLogging {
+class WebsocketHandlerActor(var tenantId: String) extends Actor with ActorSharding with ActorLogging {
 
   override implicit val system: ActorSystem = context.system
   implicit val dispatcher = context.dispatcher
 
-  var state: WebsocketConnection = EmptyWebsocketConnection
   implicit val materializer = ActorMaterializer()
 
-  context.setReceiveTimeout(60.seconds)
+  private var openConnections: Map[String, ActorRef] = Map.empty
 
   override def receive: Receive = {
-    case operation: WebsocketCommand => {
-      operation.applyTo(state) match {
-
-        case Right(Some(event)) => {
-          state = update(state, event)
-          val pub = state.asInstanceOf[OpenWebsocketConnection].publisher
-          val ref: Future[SourceRef[Message]] = Source.fromPublisher(pub).runWith(StreamRefs.sourceRef())
-          ref.map(r => Opened(Some(r))).pipeTo(sender())
-          log.info("({}) Websocket started! Id: {}", event.connectionId)
-        }
-
-        case Right(None) => {
-          sender() ! Opened(None)
-        }
-        case Left(error) => {
-          sender ! error
-        }
+    case newConnection: OpenConnection => {
+      if (tenantId == "") tenantId = newConnection.tenantId
+      val connActor = context.actorOf(Props(new WebsocketConnectionActor(newConnection.connectionId)))
+      println(connActor)
+      openConnections += (newConnection.connectionId -> connActor)
+      println(openConnections)
+      connActor.forward(newConnection)
+      log.info("({}) Websocket started! connection id: {}", tenantId, newConnection.connectionId)
+    }
+    case Notify(_, m: String) => {
+      log.info("({}) Received updates for tenant: {}", m, tenantId)
+      println(openConnections)
+      openConnections.foreach { conn =>
+        log.info("({}) updating child actor {}", conn._1)
+        conn._2 ! Update(TextMessage.apply(m))
       }
     }
-    case Notify(id: String, m: String) => {
-      state match {
-        case open: OpenWebsocketConnection =>
-          log.info("({}) Received update: {}", m)
-          open.down ! TextMessage.apply(m)
-
-        case _ => ()
-      }
-    }
-    case Close(_) =>
-      state match {
-        case EmptyWebsocketConnection =>
-          sender() ! Done
-          context.stop(self)
-        case connection: OpenWebsocketConnection =>
-          sender() ! Done
-          log.info("({}) Killed websocket actor! Id: {}", connection.connectionId)
-          context.stop(self)
-      }
-    case ReceiveTimeout =>
-      state match {
-        case EmptyWebsocketConnection => context.stop(self)
-        case connection: OpenWebsocketConnection =>
-          log.info("({}) Killed websocket actor! Id: {}", connection.connectionId)
-          connection.down ! TextMessage.apply("killed")
-          context.stop(connection.down)
-          context.stop(self)
-      }
+    case CloseConnection(_, id) =>
+      val connectionToKill = openConnections.get(id)
+      if (connectionToKill.nonEmpty) context.stop(connectionToKill.get)
+      log.info("({}) Killed websocket actor! Id: {}", tenantId, id)
+      sender() ! Done
+    case Stopped(id) =>
+      openConnections.remove(id)
   }
-
-  protected def update(state: WebsocketConnection, event: WebsocketConnection.WebsocketEvent): WebsocketConnection =
-    event.applyTo(state)
-
 }
 
 object WebsocketHandlerActor {
+
+  case class OpenConnection(tenantId: String, connectionId: String)
+
+  case class CloseConnection(tenantId: String, id: String)
 
   val numberOfShards = 100
 
   val name = "websocket-handler-actor"
 
-  def props(): Props = Props(new WebsocketHandlerActor())
+  def props(): Props = Props(new WebsocketHandlerActor(tenantId = ""))
 
   val extractEntityId: ShardRegion.ExtractEntityId = {
-    case m: WebsocketCommand => (m.connectionId, m)
-    case m: Notify           => (m.id, m)
-    case m: Close            => (m.id, m)
+    case m: OpenConnection  => (m.tenantId, m)
+    case m: Notify          => (m.tenantId, m)
+    case m: CloseConnection => (m.tenantId, m)
   }
 
   val extractShardId: ShardRegion.ExtractShardId = {
@@ -98,10 +71,10 @@ object WebsocketHandlerActor {
       (math.abs(entityId.hashCode()) % numberOfShards).toString
 
     {
-      case m: WebsocketCommand         => computeShardId(m.connectionId)
-      case m: Notify                   => computeShardId(m.id)
-      case ShardRegion.StartEntity(id) => computeShardId(id)
-      case Close(id)                   => computeShardId(id)
+      case m: OpenConnection                 => computeShardId(m.tenantId)
+      case m: Notify                         => computeShardId(m.tenantId)
+      case ShardRegion.StartEntity(tenantId) => computeShardId(tenantId)
+      case m: CloseConnection                => computeShardId(m.tenantId)
     }
   }
 

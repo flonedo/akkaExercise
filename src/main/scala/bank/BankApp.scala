@@ -15,13 +15,13 @@ import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Flow, Keep, Sink}
 import akka.util.Timeout
 import bank.actor.Messages.Done
+import bank.actor.WebsocketHandlerActor.{CloseConnection, OpenConnection}
 import bank.actor.projector.BankAccountEventProjectorActor
 import bank.actor.projector.export.BankAccountLogExporter
 import bank.actor.write.{ActorSharding, BankAccountWriterActor}
-import bank.actor.{Close, Opened, WebsocketHandlerActor}
+import bank.actor.{Opened, WebsocketHandlerActor}
 import bank.domain.BankAccount
 import bank.domain.BankAccount.BankAccountCommand
-import bank.domain.WebsocketConnection.OpenConnection
 import com.typesafe.config.ConfigFactory
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport._
 
@@ -133,10 +133,11 @@ object BankApp extends HttpApp with ActorSharding with App {
         }
       } ~
       path("socket" / connectionId) { connectionId =>
-        val sink = Sink.onComplete(_ => killActor(connectionId.toString))
-        onSuccess(websocketRegion ? OpenConnection(connectionId.toString)) {
+        val sink = Sink.onComplete(_ => killActor("Tenant", connectionId.toString))
+        onSuccess(websocketRegion ? OpenConnection("Tenant", connectionId.toString)) {
           case Opened(Some(ref)) =>
             val source = ref.source
+            println(source)
             val flow = Flow.fromSinkAndSourceCoupledMat(sink, source)(Keep.both)
             handleWebSocketMessages(flow)
           case Failure(exception: Exception) => complete(StatusCodes.BadRequest -> exception.toString)
@@ -154,8 +155,8 @@ object BankApp extends HttpApp with ActorSharding with App {
       }
     }
 
-  def killActor(id: String): Unit = {
-    val close = websocketRegion ? Close(id)
+  def killActor(tenantId: String, id: String): Unit = {
+    val close = websocketRegion ? CloseConnection(tenantId, id)
     close.onComplete {
       case Success(_) => complete(StatusCodes.OK)
       case Failure(_) => complete(StatusCodes.ImATeapot)

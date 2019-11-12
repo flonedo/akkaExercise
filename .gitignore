@@ -2,3 +2,6 @@ project
 .idea
 target
 /.env
+db.csv
+offset.csv
+logs
